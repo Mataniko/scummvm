@@ -54,7 +54,7 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	{"china", "",
 		AD_ENTRY1s("volume.rmf", "072cffb026d91b8d25d11c70f4a57fb2", 10032),
 		Common::ES_ESP,
-		Common::kPlatformPC,
+		Common::kPlatformDOS,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
@@ -63,7 +63,7 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	{"china", "",
 		AD_ENTRY1s("volume.rmf", "2da720143c1e857490daded15682df87", 9791),
 		Common::EN_ANY,
-		Common::kPlatformPC,
+		Common::kPlatformDOS,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
@@ -117,7 +117,7 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	{"dragon", "",
 		AD_ENTRY1s("volume.vga", "0d9590fdc883d6d99c06e7935423d180", 7823),
 		Common::EN_ANY,
-		Common::kPlatformPC,
+		Common::kPlatformDOS,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
@@ -126,7 +126,7 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	{"willy","",
 		AD_ENTRY1s("volume.rmf", "ba5cf24ec4b6dc044b03115a0cd5f3ff", 9896),
 		Common::EN_ANY,
-		Common::kPlatformPC,
+		Common::kPlatformDOS,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
@@ -149,7 +149,7 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 			AD_LISTEND
 		},
 		Common::EN_ANY,
-		Common::kPlatformPC,
+		Common::kPlatformDOS,
 		ADGF_CD,
 		GUIO1(GUIO_NONE)
 	},
@@ -194,12 +194,12 @@ class DgdsMetaEngine : public AdvancedMetaEngine {
 public:
 	DgdsMetaEngine() : AdvancedMetaEngine(Dgds::DgdsGameDescriptions, sizeof(ADGameDescription), DgdsGameTitles) {
 		_md5Bytes = 0;
-		_singleid = "dgds";
+		_singleId = "dgds";
 	}
 
-	virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
-		return detectGameFilebased(allFiles, Dgds::fileBasedFallback);
-	}
+	//virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
+	//	return detectGameFilebased(allFiles, Dgds::fileBasedFallback);
+	//}
 
 	virtual const char *getName() const { return "Dynamix Game Development System"; }
 	virtual const char *getOriginalCopyright() const { return "Dynamix Game Development System (c) Dynamix"; }
