@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -24,9 +24,12 @@
 #define GOB_SOUND_SOUNDBLASTER_H
 
 #include "common/mutex.h"
-#include "audio/mixer.h"
 
 #include "gob/sound/soundmixer.h"
+
+namespace Audio {
+class Mixer;
+}
 
 namespace Gob {
 
@@ -41,10 +44,12 @@ public:
 			int16 frequency, int16 fadeLength = 0);
 	void stopSound(int16 fadeLength, SoundDesc *sndDesc = 0);
 
-	void playComposition(int16 *composition, int16 freqVal,
+	void playComposition(const int16 *composition, int16 freqVal,
 			SoundDesc *sndDescs = 0, int8 sndCount = 60);
 	void stopComposition();
 	void endComposition();
+
+	void repeatComposition(int32 repCount);
 
 protected:
 	Common::Mutex _mutex;
@@ -53,6 +58,8 @@ protected:
 	int8 _compositionSampleCount;
 	int16 _composition[50];
 	int8 _compositionPos;
+
+	int32 _compositionRepCount;
 
 	SoundDesc *_curSoundDesc;
 

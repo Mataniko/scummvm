@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -119,7 +119,7 @@ void Inter_Bargon::oBargon_intro2(OpGobParams &params) {
 	MouseButtons buttons;
 	SurfacePtr surface;
 	SoundDesc samples[4];
-	int16 comp[5] = { 0, 1, 2, 3, -1 };
+	static const int16 comp[5] = { 0, 1, 2, 3, -1 };
 	static const char *const sndFiles[] = {"1INTROII.snd", "2INTROII.snd", "1INTRO3.snd", "2INTRO3.snd"};
 
 	surface = _vm->_video->initSurfDesc(320, 200);
@@ -167,8 +167,8 @@ void Inter_Bargon::oBargon_intro3(OpGobParams &params) {
 	MouseButtons buttons;
 	Video::Color *palBak;
 	SoundDesc samples[2];
-	int16 comp[3] = { 0, 1, -1 };
 	byte *palettes[4];
+	static const int16 comp[3] = { 0, 1, -1 };
 	static const char *const sndFiles[] = {"1INTROIV.snd", "2INTROIV.snd"};
 	static const char *const palFiles[] = {"2ou2.clt", "2ou3.clt", "2ou4.clt", "2ou5.clt"};
 

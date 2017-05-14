@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -27,6 +27,8 @@
 #include "common/ptr.h"
 #include "common/util.h"
 #include "common/stream.h"
+#include "common/debug.h"
+#include "common/textconsole.h"
 
 #if defined(USE_ZLIB)
   #ifdef __SYMBIAN32__
@@ -85,6 +87,64 @@ bool inflateZlibHeaderless(byte *dst, uint dstLen, const byte *src, uint srcLen,
 	return true;
 }
 
+enum {
+	kTempBufSize = 65536
+};
+
+bool inflateZlibInstallShield(byte *dst, uint dstLen, const byte *src, uint srcLen) {
+	if (!dst || !dstLen || !src || !srcLen)
+		return false;
+
+	// See if we have sync bytes. If so, just use our function for that.
+	if (srcLen >= 4 && READ_BE_UINT32(src + srcLen - 4) == 0xFFFF)
+		return inflateZlibHeaderless(dst, dstLen, src, srcLen);
+
+	// Otherwise, we have some custom code we get to use here.
+
+	byte *temp = (byte *)malloc(kTempBufSize);
+
+	uint32 bytesRead = 0, bytesProcessed = 0;
+	while (bytesRead < srcLen) {
+		uint16 chunkSize = READ_LE_UINT16(src + bytesRead);
+		bytesRead += 2;
+
+		// Initialize zlib
+		z_stream stream;
+		stream.next_in = const_cast<byte *>(src + bytesRead);
+		stream.avail_in = chunkSize;
+		stream.next_out = temp;
+		stream.avail_out = kTempBufSize;
+		stream.zalloc = Z_NULL;
+		stream.zfree = Z_NULL;
+		stream.opaque = Z_NULL;
+
+		// Negative MAX_WBITS tells zlib there's no zlib header
+		int err = inflateInit2(&stream, -MAX_WBITS);
+		if (err != Z_OK)
+			return false;
+
+		err = inflate(&stream, Z_FINISH);
+		if (err != Z_OK && err != Z_STREAM_END) {
+			inflateEnd(&stream);
+			free(temp);
+			return false;
+		}
+
+		memcpy(dst + bytesProcessed, temp, stream.total_out);
+		bytesProcessed += stream.total_out;
+
+		inflateEnd(&stream);
+		bytesRead += chunkSize;
+	}
+
+	free(temp);
+	return true;
+}
+
+#ifndef RELEASE_BUILD
+static bool _shownBackwardSeekingWarning = false;
+#endif
+
 /**
  * A simple wrapper class which can be used to wrap around an arbitrary
  * other SeekableReadStream and will then provide on-the-fly decompression support.
@@ -107,7 +167,7 @@ protected:
 
 public:
 
-	GZipReadStream(SeekableReadStream *w) : _wrapped(w), _stream() {
+	GZipReadStream(SeekableReadStream *w, uint32 knownSize = 0) : _wrapped(w), _stream() {
 		assert(w != 0);
 
 		// Verify file header is correct
@@ -122,7 +182,8 @@ public:
 			_origSize = w->readUint32LE();
 		} else {
 			// Original size not available in zlib format
-			_origSize = 0;
+			// use an otherwise known size if supplied.
+			_origSize = knownSize;
 		}
 		_pos = 0;
 		w->seek(0, SEEK_SET);
@@ -186,13 +247,17 @@ public:
 	}
 	bool seek(int32 offset, int whence = SEEK_SET) {
 		int32 newPos = 0;
-		assert(whence != SEEK_END);	// SEEK_END not supported
 		switch (whence) {
 		case SEEK_SET:
 			newPos = offset;
 			break;
 		case SEEK_CUR:
 			newPos = _pos + offset;
+			break;
+		case SEEK_END:
+			// NOTE: This can be an expensive operation (see below).
+			newPos = size() + offset;
+			break;
 		}
 
 		assert(newPos >= 0);
@@ -201,9 +266,17 @@ public:
 			// To search backward, we have to restart the whole decompression
 			// from the start of the file. A rather wasteful operation, best
 			// to avoid it. :/
-#if DEBUG
-			warning("Backward seeking in GZipReadStream detected");
+
+#ifndef RELEASE_BUILD
+			if (!_shownBackwardSeekingWarning) {
+				// We only throw this warning once per stream, to avoid
+				// getting the console swarmed with warnings when consecutive
+				// seeks are made.
+				debug(1, "Backward seeking in GZipReadStream detected");
+				_shownBackwardSeekingWarning = true;
+			}
 #endif
+
 			_pos = 0;
 			_wrapped->seek(0, SEEK_SET);
 			_zlibErr = inflateReset(&_stream);
@@ -243,6 +316,7 @@ protected:
 	ScopedPtr<WriteStream> _wrapped;
 	z_stream _stream;
 	int _zlibErr;
+	uint32 _pos;
 
 	void processData(int flushType) {
 		// This function is called by both write() and finalize().
@@ -260,7 +334,7 @@ protected:
 	}
 
 public:
-	GZipWriteStream(WriteStream *w) : _wrapped(w), _stream() {
+	GZipWriteStream(WriteStream *w) : _wrapped(w), _stream(), _pos(0) {
 		assert(w != 0);
 
 		// Adding 16 to windowBits indicates to zlib that it is supposed to
@@ -330,24 +404,31 @@ public:
 		// ... and flush it to disk
 		processData(Z_NO_FLUSH);
 
+		_pos += dataSize - _stream.avail_in;
 		return dataSize - _stream.avail_in;
 	}
+
+	virtual int32 pos() const { return _pos; }
 };
 
 #endif	// USE_ZLIB
 
-SeekableReadStream *wrapCompressedReadStream(SeekableReadStream *toBeWrapped) {
-#if defined(USE_ZLIB)
+SeekableReadStream *wrapCompressedReadStream(SeekableReadStream *toBeWrapped, uint32 knownSize) {
 	if (toBeWrapped) {
 		uint16 header = toBeWrapped->readUint16BE();
 		bool isCompressed = (header == 0x1F8B ||
 				     ((header & 0x0F00) == 0x0800 &&
 				      header % 31 == 0));
 		toBeWrapped->seek(-2, SEEK_CUR);
-		if (isCompressed)
-			return new GZipReadStream(toBeWrapped);
-	}
+		if (isCompressed) {
+#if defined(USE_ZLIB)
+			return new GZipReadStream(toBeWrapped, knownSize);
+#else
+			delete toBeWrapped;
+			return NULL;
 #endif
+		}
+	}
 	return toBeWrapped;
 }
 
@@ -360,4 +441,4 @@ WriteStream *wrapCompressedWriteStream(WriteStream *toBeWrapped) {
 }
 
 
-}	// End of namespace Common
+} // End of namespace Common

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -41,10 +41,15 @@ public:
 	uint8  getCharWidth ()        const;
 	uint8  getCharHeight()        const;
 
+	bool hasChar(uint8 c) const;
+
 	bool isMonospaced() const;
 
 	void drawLetter(Surface &surf, uint8 c, uint16 x, uint16 y,
 	                uint32 color1, uint32 color2, bool transp) const;
+
+	void drawString(const Common::String &str, int16 x, int16 y, int16 color1, int16 color2,
+	                bool transp, Surface &dest) const;
 
 private:
 	const byte *_dataPtr;

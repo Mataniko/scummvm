@@ -8,7 +8,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -31,7 +31,6 @@
 namespace Tinsel {
 
 struct OBJECT;
-struct PROCESS;
 
 enum NPS {NOT_IN, GOING_UP, GOING_DOWN, LEAVING, ENTERING};
 
@@ -110,7 +109,7 @@ struct MOVER {
 	/* NOTE: If effect polys can overlap, this needs improving */
 	bool		bInEffect;
 
-	PROCESS		*pProc;
+	Common::PROCESS		*pProc;
 
 	// Discworld 2 specific fields
 	int32		zOverride;

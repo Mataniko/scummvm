@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -55,7 +55,7 @@ Inter_Geisha::Inter_Geisha(GobEngine *vm) : Inter_v1(vm),
 	_diving      = new Geisha::Diving(vm);
 	_penetration = new Geisha::Penetration(vm);
 
-	_cheater = new Cheater_Geisha(vm, _diving);
+	_cheater = new Cheater_Geisha(vm, _diving, _penetration);
 
 	_vm->_console->registerCheater(_cheater);
 }
@@ -200,8 +200,12 @@ void Inter_Geisha::oGeisha_checkData(OpFuncParams &params) {
 	if (mode == SaveLoad::kSaveModeNone) {
 
 		exists = _vm->_dataIO->hasFile(file);
-		if (!exists)
-			warning("File \"%s\" not found", file.c_str());
+		if (!exists) {
+			// NOTE: Geisha looks if fin.tot exists to check if it needs to open disk3.stk.
+			//       This is completely normal, so don't print a warning.
+			if (file != "fin.tot")
+				warning("File \"%s\" not found", file.c_str());
+		}
 
 	} else if (mode == SaveLoad::kSaveModeSave)
 		exists = _vm->_saveLoad->getSize(file.c_str()) >= 0;
@@ -225,7 +229,7 @@ void Inter_Geisha::oGeisha_readData(OpFuncParams &params) {
 
 		if (!_vm->_saveLoad->load(file, dataVar, 0, 0)) {
 
-			GUI::MessageDialog dialog(_("Failed to load game state from file."));
+			GUI::MessageDialog dialog(_("Failed to load saved game from file."));
 			dialog.runModal();
 
 		} else
@@ -256,7 +260,7 @@ void Inter_Geisha::oGeisha_writeData(OpFuncParams &params) {
 
 		if (!_vm->_saveLoad->save(file, dataVar, size, 0)) {
 
-			GUI::MessageDialog dialog(_("Failed to save game state to file."));
+			GUI::MessageDialog dialog(_("Failed to save game to file."));
 			dialog.runModal();
 
 		} else
@@ -272,12 +276,12 @@ void Inter_Geisha::oGeisha_writeData(OpFuncParams &params) {
 }
 
 void Inter_Geisha::oGeisha_gamePenetration(OpGobParams &params) {
-	uint16 var1      = _vm->_game->_script->readUint16();
-	uint16 var2      = _vm->_game->_script->readUint16();
-	uint16 var3      = _vm->_game->_script->readUint16();
-	uint16 resultVar = _vm->_game->_script->readUint16();
+	uint16 hasAccessPass = _vm->_game->_script->readUint16();
+	uint16 hasMaxEnergy  = _vm->_game->_script->readUint16();
+	uint16 testMode      = _vm->_game->_script->readUint16();
+	uint16 resultVar     = _vm->_game->_script->readUint16();
 
-	bool result = _penetration->play(var1, var2, var3);
+	bool result = _penetration->play(hasAccessPass, hasMaxEnergy, testMode);
 
 	WRITE_VAR_UINT32(resultVar, result ? 1 : 0);
 }
@@ -298,9 +302,8 @@ void Inter_Geisha::oGeisha_loadTitleMusic(OpGobParams &params) {
 }
 
 void Inter_Geisha::oGeisha_playMusic(OpGobParams &params) {
-	// TODO: The MDYPlayer is still broken!
-	warning("Geisha Stub: oGeisha_playMusic");
-	// _vm->_sound->adlibPlay();
+	_vm->_sound->adlibSetRepeating(-1);
+	_vm->_sound->adlibPlay();
 }
 
 void Inter_Geisha::oGeisha_stopMusic(OpGobParams &params) {

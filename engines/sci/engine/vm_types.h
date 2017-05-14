@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -30,44 +30,60 @@ namespace Sci {
 // Segment ID type
 typedef uint16 SegmentId;
 
+enum {
+	kUninitializedSegment = 0x1FFF,
+	kSegmentMask = 0x1FFF,
+	kOffsetMask = 0x7FFFF
+};
+
 struct reg_t {
-	SegmentId segment;
-	uint16 offset;
+	// Segment and offset. These should never be accessed directly
+	SegmentId _segment;
+	uint16 _offset;
+
+	SegmentId getSegment() const;
+	void setSegment(SegmentId segment);
+	uint32 getOffset() const;
+	void setOffset(uint32 offset);
+
+	inline void incOffset(int32 offset) {
+		setOffset(getOffset() + offset);
+	}
 
 	inline bool isNull() const {
-		return (offset | segment) == 0;
+		return (getOffset() | getSegment()) == 0;
 	}
 
 	inline uint16 toUint16() const {
-		return offset;
+		return (uint16)getOffset();
 	}
 
 	inline int16 toSint16() const {
-		return (int16)offset;
+		return (int16)getOffset();
 	}
 
 	bool isNumber() const {
-		return segment == 0;
+		return getSegment() == 0;
 	}
 
 	bool isPointer() const {
-		return segment != 0 && segment != 0xFFFF;
+		return getSegment() != 0 && getSegment() != kUninitializedSegment;
 	}
 
 	uint16 requireUint16() const;
 	int16 requireSint16() const;
 
 	inline bool isInitialized() const {
-		return segment != 0xFFFF;
+		return getSegment() != kUninitializedSegment;
 	}
 
 	// Comparison operators
 	bool operator==(const reg_t &x) const {
-		return (offset == x.offset) && (segment == x.segment);
+		return (getOffset() == x.getOffset()) && (getSegment() == x.getSegment());
 	}
 
 	bool operator!=(const reg_t &x) const {
-		return (offset != x.offset) || (segment != x.segment);
+		return (getOffset() != x.getOffset()) || (getSegment() != x.getSegment());
 	}
 
 	bool operator>(const reg_t right) const {
@@ -126,6 +142,19 @@ struct reg_t {
 	reg_t operator|(const reg_t right) const;
 	reg_t operator^(const reg_t right) const;
 
+#ifdef ENABLE_SCI32
+	reg_t operator&(int16 right) const;
+	reg_t operator|(int16 right) const;
+	reg_t operator^(int16 right) const;
+
+	void operator&=(const reg_t &right) { *this = *this & right; }
+	void operator|=(const reg_t &right) { *this = *this | right; }
+	void operator^=(const reg_t &right) { *this = *this ^ right; }
+	void operator&=(int16 right) { *this = *this & right; }
+	void operator|=(int16 right) { *this = *this | right; }
+	void operator^=(int16 right) { *this = *this ^ right; }
+#endif
+
 private:
 	/**
 	 * Compares two reg_t's.
@@ -135,18 +164,65 @@ private:
 	 * - a negative number if *this < right
 	 */
 	int cmp(const reg_t right, bool treatAsUnsigned) const;
-	reg_t lookForWorkaround(const reg_t right) const;
+	reg_t lookForWorkaround(const reg_t right, const char *operation) const;
 	bool pointerComparisonWithInteger(const reg_t right) const;
+
+#ifdef ENABLE_SCI32
+	int sci32Comparison(const reg_t right) const;
+#endif
 };
 
 static inline reg_t make_reg(SegmentId segment, uint16 offset) {
 	reg_t r;
-	r.offset = offset;
-	r.segment = segment;
+	r.setSegment(segment);
+	r.setOffset(offset);
 	return r;
 }
 
-#define PRINT_REG(r) (0xffff) & (unsigned) (r).segment, (unsigned) (r).offset
+#define PRINT_REG(r) (kSegmentMask) & (unsigned) (r).getSegment(), (unsigned) (r).getOffset()
+
+// A true 32-bit reg_t
+struct reg32_t {
+	// Segment and offset. These should never be accessed directly
+	SegmentId _segment;
+	uint32 _offset;
+
+	inline SegmentId getSegment() const {
+		return _segment;
+	}
+
+	inline void setSegment(SegmentId segment) {
+		_segment = segment;
+	}
+
+	inline uint32 getOffset() const {
+		return _offset;
+	}
+
+	inline void setOffset(uint32 offset) {
+		_offset = offset;
+	}
+
+	inline void incOffset(int32 offset) {
+		setOffset(getOffset() + offset);
+	}
+
+	// Comparison operators
+	bool operator==(const reg32_t &x) const {
+		return (getOffset() == x.getOffset()) && (getSegment() == x.getSegment());
+	}
+
+	bool operator!=(const reg32_t &x) const {
+		return (getOffset() != x.getOffset()) || (getSegment() != x.getSegment());
+	}
+};
+
+static inline reg32_t make_reg32(SegmentId segment, uint32 offset) {
+	reg32_t r;
+	r.setSegment(segment);
+	r.setOffset(offset);
+	return r;
+}
 
 // Stack pointer type
 typedef reg_t *StackPtr;

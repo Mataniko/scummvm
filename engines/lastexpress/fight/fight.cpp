@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -31,6 +31,7 @@
 #include "lastexpress/data/cursor.h"
 #include "lastexpress/data/sequence.h"
 
+#include "lastexpress/game/entities.h"
 #include "lastexpress/game/inventory.h"
 #include "lastexpress/game/logic.h"
 #include "lastexpress/game/object.h"
@@ -40,7 +41,6 @@
 #include "lastexpress/sound/queue.h"
 
 #include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
 
@@ -53,6 +53,8 @@ Fight::FightData::FightData() {
 	index = 0;
 
 	isFightRunning = false;
+
+	memset(&sequences, 0, sizeof(sequences));
 }
 
 Fight::FightData::~FightData() {
@@ -220,7 +222,7 @@ Fight::FightEndType Fight::setup(FightType type) {
 		break;
 
 	case kFightMilos:
-		sceneIndex = (getObjects()->get(kObjectCompartment1).location2 < kObjectLocation3) ? kSceneFightMilos : kSceneFightMilosBedOpened;
+		sceneIndex = (getObjects()->get(kObjectCompartment1).model < kObjectModel3) ? kSceneFightMilos : kSceneFightMilosBedOpened;
 		break;
 
 	case kFightAnna:
@@ -399,6 +401,9 @@ end_load:
 }
 
 void Fight::setOpponents() {
+	if (!_data)
+		error("[Fight::setOpponents] Data not initialized");
+
 	_data->player->setOpponent(_data->opponent);
 	_data->opponent->setOpponent(_data->player);
 

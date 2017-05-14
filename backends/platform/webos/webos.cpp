@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,25 +44,5 @@ void OSystem_SDL_WebOS::initBackend() {
 	// Call parent implementation of this method
 	OSystem_SDL::initBackend();
 }
-
-/**
- * Gets the original SDL hardware key set, adds WebOS specific keys and
- * returns the new key set.
- *
- * @return The hardware key set with added webOS specific keys.
- */
-#ifdef ENABLE_KEYMAPPER
-HardwareInputSet *OSystem_SDL_WebOS::getHardwareInputSet() {
-	// Get the original SDL hardware key set
-	HardwareInputSet *inputSet = OSystem_SDL::getHardwareInputSet();
-
-	// Add WebOS specific keys
-	inputSet->addHardwareInput(new HardwareInput("FORWARD",
-		KeyState((KeyCode) 229, 229, 0), "Forward"));
-
-	// Return the modified hardware key set
-	return inputSet;
-}
-#endif
 
 #endif

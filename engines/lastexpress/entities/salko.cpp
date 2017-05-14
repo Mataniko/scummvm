@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -33,10 +33,8 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/lastexpress.h"
-#include "lastexpress/helpers.h"
 
 namespace LastExpress {
 
@@ -137,7 +135,7 @@ IMPLEMENT_FUNCTION_II(7, Salko, function7, CarIndex, EntityPosition)
 		break;
 
 	case kAction123668192:
-		CALLBACK_ACTION();
+		callbackAction();
 		break;
 	}
 IMPLEMENT_FUNCTION_END
@@ -158,7 +156,7 @@ IMPLEMENT_FUNCTION(9, Salko, chapter1)
 		break;
 
 	case kActionNone:
-		TIME_CHECK(kTimeChapter1, params->param1, setup_chapter1Handler);
+		Entity::timeCheck(kTimeChapter1, params->param1, WRAP_SETUP_FUNCTION(Salko, setup_chapter1Handler));
 		break;
 
 	case kActionDefault:
@@ -301,7 +299,8 @@ IMPLEMENT_FUNCTION(15, Salko, chapter3Handler)
 
 	case kActionNone:
 		if (getState()->time < kTime2200500) {
-			UPDATE_PARAM(params->param1, getState()->time, 81000);
+			if (!Entity::updateParameter(params->param1, getState()->time, 81000))
+				break;
 
 			setCallback(1);
 			setup_function16();
@@ -331,7 +330,8 @@ IMPLEMENT_FUNCTION(16, Salko, function16)
 		}
 
 label_callback3:
-		UPDATE_PARAM(params->param1, getState()->time, 4500);
+		if (!Entity::updateParameter(params->param1, getState()->time, 4500))
+			break;
 
 		getSavePoints()->push(kEntitySalko, kEntitySalko, kAction101169464);
 		break;
@@ -390,7 +390,7 @@ label_callback3:
 			getData()->entityPosition = kPosition_2740;
 			getEntities()->clearSequences(kEntitySalko);
 
-			CALLBACK_ACTION();
+			callbackAction();
 			break;
 		}
 		break;

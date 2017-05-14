@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 /* unzip.c -- IO on .zip files using zlib
@@ -333,8 +334,10 @@ int unzGetLocalExtrafield(unzFile file, voidp buf, unsigned len);
 #define SIZEZIPLOCALHEADER (0x1e)
 
 
+#if 0
 const char unz_copyright[] =
    " unzip 0.15 Copyright 1998 Gilles Vollant ";
+#endif
 
 /* unz_file_info_interntal contain internal info about a file in zipfile*/
 typedef struct {
@@ -1463,22 +1466,16 @@ bool ZipArchive::hasFile(const String &name) const {
 }
 
 int ZipArchive::listMembers(ArchiveMemberList &list) const {
-	int matches = 0;
-	int err = unzGoToFirstFile(_zipFile);
+	int members = 0;
 
-	while (err == UNZ_OK) {
-		char szCurrentFileName[UNZ_MAXFILENAMEINZIP+1];
-		if (unzGetCurrentFileInfo(_zipFile, NULL,
-		                          szCurrentFileName, sizeof(szCurrentFileName)-1,
-		                          NULL, 0, NULL, 0) == UNZ_OK) {
-			list.push_back(ArchiveMemberList::value_type(new GenericArchiveMember(szCurrentFileName, this)));
-			matches++;
-		}
-
-		err = unzGoToNextFile(_zipFile);
+	const unz_s *const archive = (const unz_s *)_zipFile;
+	for (ZipHash::const_iterator i = archive->_hash.begin(), end = archive->_hash.end();
+	     i != end; ++i) {
+		list.push_back(ArchiveMemberList::value_type(new GenericArchiveMember(i->_key, this)));
+		++members;
 	}
 
-	return matches;
+	return members;
 }
 
 const ArchiveMemberPtr ZipArchive::getMember(const String &name) const {
@@ -1540,4 +1537,4 @@ Archive *makeZipArchive(SeekableReadStream *stream) {
 	return new ZipArchive(zipFile);
 }
 
-}	// End of namespace Common
+} // End of namespace Common

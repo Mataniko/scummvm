@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -424,8 +424,7 @@ static void art_vpath_render_bez(ArtVpath **p_vpath, int *pn, int *pn_max,
 		                     x_m, y_m, xb1, yb1, xb2, yb2, x3, y3, flatness);
 	} else {
 		// don't subdivide
-		art_vpath_add_point(p_vpath, pn, pn_max,
-	           	         ART_LINETO, x3, y3);
+		art_vpath_add_point(p_vpath, pn, pn_max, ART_LINETO, x3, y3);
 	}
 }
 
@@ -2367,38 +2366,30 @@ ArtSVPRenderAAIter *art_svp_render_aa_iter(const ArtSVP *svp,
 	return iter;
 }
 
-#define ADD_STEP(xpos, xdelta)                          \
+#define ADD_STEP(xpos, xdelta)                            \
 	/* stereotype code fragment for adding a step */      \
-	if (n_steps == 0 || steps[n_steps - 1].x < xpos)      \
-	{                                                   \
+	if (n_steps == 0 || steps[n_steps - 1].x < xpos) {    \
 		sx = n_steps;                                     \
 		steps[sx].x = xpos;                               \
 		steps[sx].delta = xdelta;                         \
 		n_steps++;                                        \
-	}                                                   \
-	else                                                  \
-	{                                                   \
-		for (sx = n_steps; sx > 0; sx--)                  \
-		{                                               \
-			if (steps[sx - 1].x == xpos)                  \
-			{                                           \
+	} else {                                              \
+		for (sx = n_steps; sx > 0; sx--) {                \
+			if (steps[sx - 1].x == xpos) {                \
 				steps[sx - 1].delta += xdelta;            \
 				sx = n_steps;                             \
 				break;                                    \
-			}                                           \
-			else if (steps[sx - 1].x < xpos)              \
-			{                                           \
+			} else if (steps[sx - 1].x < xpos) {          \
 				break;                                    \
-			}                                           \
-		}                                               \
-		if (sx < n_steps)                                 \
-		{                                               \
+			}                                             \
+		}                                                 \
+		if (sx < n_steps) {                               \
 			memmove (&steps[sx + 1], &steps[sx],          \
 			         (n_steps - sx) * sizeof(steps[0]));  \
 			steps[sx].x = xpos;                           \
 			steps[sx].delta = xdelta;                     \
 			n_steps++;                                    \
-		}                                               \
+		}                                                 \
 	}
 
 void art_svp_render_aa_iter_step(ArtSVPRenderAAIter *iter, int *p_start,

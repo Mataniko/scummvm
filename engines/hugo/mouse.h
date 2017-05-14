@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -29,6 +29,13 @@
 
 #ifndef HUGO_MOUSE_H
 #define HUGO_MOUSE_H
+
+#include "hugo/game.h"
+
+namespace Common {
+class ReadStream;
+}
+
 namespace Hugo {
 
 class MouseHandler {
@@ -70,17 +77,17 @@ private:
 		kMsExit      = 1
 	};
 
-	hotspot_t *_hotspots;
+	Hotspot *_hotspots;
 	bool  _leftButtonFl;                                // Left mouse button pressed
 	bool  _rightButtonFl;                               // Right button pressed
 	int   _mouseX;
 	int   _mouseY;
 	bool  _jumpExitFl;                                  // Allowed to jump to a screen exit
 
-	void  cursorText(const char *buffer, const int16 cx, const int16 cy, const uif_t fontId, const int16 color);
+	void  cursorText(const char *buffer, const int16 cx, const int16 cy, const Uif fontId, const int16 color);
 	void  processRightClick(const int16 objId, const int16 cx, const int16 cy);
 	void  processLeftClick(const int16 objId, const int16 cx, const int16 cy);
-	void  readHotspot(Common::ReadStream &in, hotspot_t &hotspot);
+	void  readHotspot(Common::ReadStream &in, Hotspot &hotspot);
 };
 
 } // End of namespace Hugo

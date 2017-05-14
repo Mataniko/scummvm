@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -173,7 +173,7 @@ static const ADGameDescription gameDescriptions[] = {
 		ADGF_UNSTABLE,
 		GUIO1(GUIO_NOASPECT)
 	},
-	
+
 	// The Last Express (Russian)
 	//   expressw.exe 1999-04-05 15:33:56
 	//   express.exe  ???
@@ -199,8 +199,8 @@ static const ADGameDescription gameDescriptions[] = {
 class LastExpressMetaEngine : public AdvancedMetaEngine {
 public:
 	LastExpressMetaEngine() : AdvancedMetaEngine(gameDescriptions, sizeof(ADGameDescription), lastExpressGames) {
-		_singleid = "lastexpress";
-		_guioptions = GUIO2(GUIO_NOSUBTITLES, GUIO_NOSFX);
+		_singleId = "lastexpress";
+		_guiOptions = GUIO2(GUIO_NOSUBTITLES, GUIO_NOSFX);
 	}
 
 	const char *getName() const {
@@ -211,6 +211,7 @@ public:
 		return "LastExpress Engine (C) 1997 Smoking Car Productions";
 	}
 
+protected:
 	bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const;
 };
 

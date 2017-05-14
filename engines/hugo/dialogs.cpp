@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -21,12 +21,13 @@
  */
 
 #include "common/substream.h"
-#include "graphics/decoders/bmp.h"
 #include "gui/gui-manager.h"
 #include "gui/ThemeEval.h"
+#include "image/bmp.h"
 
 #include "hugo/hugo.h"
-#include "hugo/display.h"
+#include "hugo/dialogs.h"
+#include "hugo/file.h"
 #include "hugo/parser.h"
 #include "hugo/schedule.h"
 #include "hugo/sound.h"
@@ -34,19 +35,21 @@
 
 namespace Hugo {
 
-TopMenu::TopMenu(HugoEngine *vm) : Dialog(0, 0, kMenuWidth, kMenuHeight), arrayBmp(0), arraySize(0),
-	_vm(vm) {
+TopMenu::TopMenu(HugoEngine *vm) : Dialog(0, 0, kMenuWidth, kMenuHeight), _vm(vm) {
+	_arrayBmp = nullptr;
+	_arraySize = 0;
+
 	init();
 }
 
 TopMenu::~TopMenu() {
-	for (int i = 0; i < arraySize; i++) {
-		arrayBmp[i * 2]->free();
-		delete arrayBmp[i * 2];
-		arrayBmp[i * 2 + 1]->free();
-		delete arrayBmp[i * 2 + 1];
+	for (int i = 0; i < _arraySize; i++) {
+		_arrayBmp[i * 2]->free();
+		delete _arrayBmp[i * 2];
+		_arrayBmp[i * 2 + 1]->free();
+		delete _arrayBmp[i * 2 + 1];
 	}
-	delete[] arrayBmp;
+	delete[] _arrayBmp;
 }
 
 void TopMenu::init() {
@@ -105,31 +108,30 @@ void TopMenu::reflowLayout() {
 	x += kButtonWidth + kButtonPad;
 
 	_inventButton->resize(x * scale, y * scale, kButtonWidth * scale, kButtonHeight * scale);
-	x += kButtonWidth + kButtonPad;
 
 	// Set the graphics to the 'on' buttons, except for the variable ones
-	_whatButton->setGfx(arrayBmp[4 * kMenuWhat + scale - 1]);
-	_musicButton->setGfx(arrayBmp[4 * kMenuMusic + scale - 1 + ((_vm->_config.musicFl) ? 0 : 2)]);
-	_soundFXButton->setGfx(arrayBmp[4 * kMenuSoundFX + scale - 1 + ((_vm->_config.soundFl) ? 0 : 2)]);
-	_saveButton->setGfx(arrayBmp[4 * kMenuSave + scale - 1]);
-	_loadButton->setGfx(arrayBmp[4 * kMenuLoad + scale - 1]);
-	_recallButton->setGfx(arrayBmp[4 * kMenuRecall + scale - 1]);
-	_turboButton->setGfx(arrayBmp[4 * kMenuTurbo + scale - 1 + ((_vm->_config.turboFl) ? 0 : 2)]);
-	_lookButton->setGfx(arrayBmp[4 * kMenuLook + scale - 1]);
-	_inventButton->setGfx(arrayBmp[4 * kMenuInventory + scale - 1]);
+	_whatButton->setGfx(_arrayBmp[4 * kMenuWhat + scale - 1]);
+	_musicButton->setGfx(_arrayBmp[4 * kMenuMusic + scale - 1 + ((_vm->_config._musicFl) ? 0 : 2)]);
+	_soundFXButton->setGfx(_arrayBmp[4 * kMenuSoundFX + scale - 1 + ((_vm->_config._soundFl) ? 0 : 2)]);
+	_saveButton->setGfx(_arrayBmp[4 * kMenuSave + scale - 1]);
+	_loadButton->setGfx(_arrayBmp[4 * kMenuLoad + scale - 1]);
+	_recallButton->setGfx(_arrayBmp[4 * kMenuRecall + scale - 1]);
+	_turboButton->setGfx(_arrayBmp[4 * kMenuTurbo + scale - 1 + ((_vm->_config._turboFl) ? 0 : 2)]);
+	_lookButton->setGfx(_arrayBmp[4 * kMenuLook + scale - 1]);
+	_inventButton->setGfx(_arrayBmp[4 * kMenuInventory + scale - 1]);
 }
 
 void TopMenu::loadBmpArr(Common::SeekableReadStream &in) {
-	arraySize = in.readUint16BE();
+	_arraySize = in.readUint16BE();
 
-	delete arrayBmp;
-	arrayBmp = new Graphics::Surface *[arraySize * 2];
-	for (int i = 0; i < arraySize; i++) {
+	delete _arrayBmp;
+	_arrayBmp = new Graphics::Surface *[_arraySize * 2];
+	for (int i = 0; i < _arraySize; i++) {
 		uint16 bmpSize = in.readUint16BE();
 		uint32 filPos = in.pos();
 		Common::SeekableSubReadStream stream(&in, filPos, filPos + bmpSize);
 
-		Graphics::BitmapDecoder bitmapDecoder;
+		Image::BitmapDecoder bitmapDecoder;
 		if (!bitmapDecoder.loadStream(stream))
 			error("TopMenu::loadBmpArr(): Could not load bitmap");
 
@@ -137,28 +139,26 @@ void TopMenu::loadBmpArr(Common::SeekableReadStream &in) {
 		if (bitmapSrc->format.bytesPerPixel == 1)
 			error("TopMenu::loadBmpArr(): Unhandled paletted image");
 
-		arrayBmp[i * 2] = bitmapSrc->convertTo(g_system->getOverlayFormat());
-		arrayBmp[i * 2 + 1] = new Graphics::Surface();
-		arrayBmp[i * 2 + 1]->create(arrayBmp[i * 2]->w * 2, arrayBmp[i * 2]->h * 2, g_system->getOverlayFormat());
-		byte *src = (byte *)arrayBmp[i * 2]->pixels;
-		byte *dst = (byte *)arrayBmp[i * 2 + 1]->pixels;
+		_arrayBmp[i * 2] = bitmapSrc->convertTo(g_system->getOverlayFormat());
+		_arrayBmp[i * 2 + 1] = new Graphics::Surface();
+		_arrayBmp[i * 2 + 1]->create(_arrayBmp[i * 2]->w * 2, _arrayBmp[i * 2]->h * 2, g_system->getOverlayFormat());
 
-		for (int j = 0; j < arrayBmp[i * 2]->h; j++) {
-			src = (byte *)arrayBmp[i * 2]->getBasePtr(0, j);
-			dst = (byte *)arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2);
-			for (int k = arrayBmp[i * 2]->w; k > 0; k--) {
-				for (int m = arrayBmp[i * 2]->format.bytesPerPixel; m > 0; m--) {
+		for (int j = 0; j < _arrayBmp[i * 2]->h; j++) {
+			byte *src = (byte *)_arrayBmp[i * 2]->getBasePtr(0, j);
+			byte *dst = (byte *)_arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2);
+			for (int k = _arrayBmp[i * 2]->w; k > 0; k--) {
+				for (int m = _arrayBmp[i * 2]->format.bytesPerPixel; m > 0; m--) {
 					*dst++ = *src++;
 				}
-				src -= arrayBmp[i * 2]->format.bytesPerPixel;
+				src -= _arrayBmp[i * 2]->format.bytesPerPixel;
 
-				for (int m = arrayBmp[i * 2]->format.bytesPerPixel; m > 0; m--) {
+				for (int m = _arrayBmp[i * 2]->format.bytesPerPixel; m > 0; m--) {
 					*dst++ = *src++;
 				}
 			}
-			src = (byte *)arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2);
-			dst = (byte *)arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2 + 1);
-			for (int k = arrayBmp[i * 2 + 1]->pitch; k > 0; k--) {
+			src = (byte *)_arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2);
+			dst = (byte *)_arrayBmp[i * 2 + 1]->getBasePtr(0, j * 2 + 1);
+			for (int k = _arrayBmp[i * 2 + 1]->pitch; k > 0; k--) {
 				*dst++ = *src++;
 			}
 		}
@@ -171,12 +171,12 @@ void TopMenu::handleCommand(GUI::CommandSender *sender, uint32 command, uint32 d
 	switch (command) {
 	case kCmdWhat:
 		close();
-		_vm->getGameStatus().helpFl = true;
+		_vm->getGameStatus()._helpFl = true;
 
 		break;
 	case kCmdMusic:
 		_vm->_sound->toggleMusic();
-		_musicButton->setGfx(arrayBmp[4 * kMenuMusic + (g_system->getOverlayWidth() > 320 ? 2 : 1) - 1 + ((_vm->_config.musicFl) ? 0 : 2)]);
+		_musicButton->setGfx(_arrayBmp[4 * kMenuMusic + (g_system->getOverlayWidth() > 320 ? 2 : 1) - 1 + ((_vm->_config._musicFl) ? 0 : 2)]);
 		_musicButton->draw();
 		g_gui.theme()->updateScreen();
 		g_system->updateScreen();
@@ -194,8 +194,8 @@ void TopMenu::handleCommand(GUI::CommandSender *sender, uint32 command, uint32 d
 		break;
 	case kCmdSave:
 		close();
-		if (_vm->getGameStatus().viewState == kViewPlay) {
-			if (_vm->getGameStatus().gameOverFl)
+		if (_vm->getGameStatus()._viewState == kViewPlay) {
+			if (_vm->getGameStatus()._gameOverFl)
 				_vm->gameOverMsg();
 			else
 				_vm->_file->saveGame(-1, Common::String());
@@ -207,7 +207,7 @@ void TopMenu::handleCommand(GUI::CommandSender *sender, uint32 command, uint32 d
 		break;
 	case kCmdRecall:
 		close();
-		_vm->getGameStatus().recallFl = true;
+		_vm->getGameStatus()._recallFl = true;
 		break;
 	case kCmdTurbo:
 		_vm->_parser->switchTurbo();

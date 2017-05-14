@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -27,8 +27,6 @@
 #include "lastexpress/data/sequence.h"
 
 // Entities
-#include "lastexpress/entities/entity.h"
-
 #include "lastexpress/entities/abbot.h"
 #include "lastexpress/entities/alexei.h"
 #include "lastexpress/entities/alouan.h"
@@ -53,8 +51,6 @@
 #include "lastexpress/entities/pascale.h"
 #include "lastexpress/entities/rebecca.h"
 #include "lastexpress/entities/salko.h"
-#include "lastexpress/entities/servers0.h"
-#include "lastexpress/entities/servers1.h"
 #include "lastexpress/entities/sophie.h"
 #include "lastexpress/entities/tables.h"
 #include "lastexpress/entities/tatiana.h"
@@ -62,6 +58,8 @@
 #include "lastexpress/entities/vassili.h"
 #include "lastexpress/entities/verges.h"
 #include "lastexpress/entities/vesna.h"
+#include "lastexpress/entities/waiter1.h"
+#include "lastexpress/entities/waiter2.h"
 #include "lastexpress/entities/yasmin.h"
 
 // Game
@@ -71,10 +69,8 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
 
@@ -138,8 +134,8 @@ Entities::Entities(LastExpressEngine *engine) : _engine(engine) {
 	ADD_ENTITY(Mertens);
 	ADD_ENTITY(Coudert);
 	ADD_ENTITY(Pascale);
-	ADD_ENTITY(Servers0);
-	ADD_ENTITY(Servers1);
+	ADD_ENTITY(Waiter1);
+	ADD_ENTITY(Waiter2);
 	ADD_ENTITY(Cooks);
 	ADD_ENTITY(Verges);
 	ADD_ENTITY(Tatiana);
@@ -185,7 +181,7 @@ Entities::Entities(LastExpressEngine *engine) : _engine(engine) {
 Entities::~Entities() {
 	SAFE_DELETE(_header);
 
-	for (int i = 0; i < (int)_entities.size(); i++)
+	for (uint i = 0; i < _entities.size(); i++)
 		SAFE_DELETE(_entities[i]);
 
 	_entities.clear();
@@ -392,7 +388,6 @@ void Entities::resetState(EntityIndex entityIndex) {
 
 	getLogic()->updateCursor();
 }
-
 
 void Entities::updateFields() const {
 	if (!getFlags()->isGameRunning)
@@ -673,11 +668,12 @@ void Entities::executeCallbacks() {
 //////////////////////////////////////////////////////////////////////////
 // Processing
 //////////////////////////////////////////////////////////////////////////
-#define INCREMENT_DIRECTION_COUNTER() { \
-	data->doProcessEntity = false; \
-	if (data->direction == kDirectionRight || (data->direction == kDirectionSwitch && data->directionSwitch == kDirectionRight)) \
-		++data->field_4A1; \
-	}
+void Entities::incrementDirectionCounter(EntityData::EntityCallData *data) const {
+	data->doProcessEntity = false;
+
+	if (data->direction == kDirectionRight || (data->direction == kDirectionSwitch && data->directionSwitch == kDirectionRight))
+		++data->field_4A1;
+}
 
 void Entities::processEntity(EntityIndex entityIndex) {
 	EntityData::EntityCallData *data = getData(entityIndex);
@@ -696,7 +692,7 @@ void Entities::processEntity(EntityIndex entityIndex) {
 		getScenes()->removeAndRedraw(&data->frame, false);
 		getScenes()->removeAndRedraw(&data->frame1, false);
 
-		INCREMENT_DIRECTION_COUNTER();
+		incrementDirectionCounter(data);
 		return;
 	}
 
@@ -726,7 +722,7 @@ label_nosequence:
 			processFrame(entityIndex, false, true);
 
 			if (!getFlags()->flag_entities_0 && !data->doProcessEntity) {
-				INCREMENT_DIRECTION_COUNTER();
+				incrementDirectionCounter(data);
 				return;
 			}
 		} else {
@@ -744,7 +740,7 @@ label_nosequence:
 				data->position = 0;
 			}
 
-			INCREMENT_DIRECTION_COUNTER();
+			incrementDirectionCounter(data);
 		}
 		return;
 	}
@@ -754,46 +750,44 @@ label_nosequence:
 
 	if (data->frame->getInfo()->field_30 > (data->field_49B + 1) || (data->direction == kDirectionLeft && data->sequence->count() == 1)) {
 		++data->field_49B;
-	} else {
-		if (data->frame->getInfo()->field_30 > data->field_49B && !data->frame->getInfo()->keepPreviousFrame) {
-			++data->field_49B;
-		} else {
-			if (data->frame->getInfo()->keepPreviousFrame == 1)
+	} else if (data->frame->getInfo()->field_30 <= data->field_49B || data->frame->getInfo()->keepPreviousFrame) {
+		if (data->frame->getInfo()->keepPreviousFrame == 1)
+			keepPreviousFrame = true;
+
+		// Increment current frame
+		++data->currentFrame;
+
+		if (data->currentFrame > (int16)(data->sequence->count() - 1) || (data->field_4A9 && checkSequenceFromPosition(entityIndex))) {
+
+			if (data->direction == kDirectionLeft) {
+				data->currentFrame = 0;
+			} else {
 				keepPreviousFrame = true;
+				drawNextSequence(entityIndex);
 
-			// Increment current frame
-			++data->currentFrame;
+				if (getFlags()->flag_entities_0 || data->doProcessEntity)
+					return;
 
-			if (data->currentFrame > (int16)(data->sequence->count() - 1) || (data->field_4A9 && checkSequenceFromPosition(entityIndex))) {
-
-				if (data->direction == kDirectionLeft) {
-					data->currentFrame = 0;
-				} else {
-					keepPreviousFrame = true;
-					drawNextSequence(entityIndex);
-
-					if (getFlags()->flag_entities_0 || data->doProcessEntity)
-						return;
-
-					if (!data->sequence2) {
-						updateEntityPosition(entityIndex);
-						data->doProcessEntity = false;
-						return;
-					}
-
-					copySequenceData(entityIndex);
+				if (!data->sequence2) {
+					updateEntityPosition(entityIndex);
+					data->doProcessEntity = false;
+					return;
 				}
 
+				copySequenceData(entityIndex);
 			}
 
-			processFrame(entityIndex, keepPreviousFrame, false);
-
-			if (getFlags()->flag_entities_0 || data->doProcessEntity)
-				return;
 		}
+
+		processFrame(entityIndex, keepPreviousFrame, false);
+
+		if (getFlags()->flag_entities_0 || data->doProcessEntity)
+			return;
+	} else {
+		++data->field_49B;
 	}
 
-	INCREMENT_DIRECTION_COUNTER();
+	incrementDirectionCounter(data);
 }
 
 void Entities::computeCurrentFrame(EntityIndex entityIndex) const {
@@ -901,7 +895,6 @@ void Entities::computeCurrentFrame(EntityIndex entityIndex) const {
 
 		}
 		break;
-
 
 	case kDirectionLeft:
 		if (data->currentFrame == -1 || data->currentFrame >= (int32)data->sequence->count()) {
@@ -1777,8 +1770,7 @@ void Entities::enterCompartment(EntityIndex entity, ObjectIndex compartment, boo
 
 	// Update compartments
 	int index = (compartment < 32 ? compartment - 1 : compartment - 24);
-	if (index >= 16)
-		error("[Entities::enterCompartment] Invalid compartment index");
+	assert(index < 16);
 
 	if (useCompartment1)
 		_compartments1[index] |= STORE_VALUE(entity);
@@ -1863,8 +1855,7 @@ void Entities::exitCompartment(EntityIndex entity, ObjectIndex compartment, bool
 
 	// Update compartments
 	int index = (compartment < 32 ? compartment - 1 : compartment - 24);
-	if (index >= 16)
-		error("[Entities::exitCompartment] Invalid compartment index");
+	assert(index < 16);
 
 	if (useCompartment1)
 		_compartments1[index] &= ~STORE_VALUE(entity);
@@ -2283,7 +2274,7 @@ label_process_entity:
 
 							if (getScenes()->checkPosition(kSceneNone, SceneManager::kCheckPositionLookingUp)) {
 								 getSavePoints()->push(kEntityPlayer, entity, kActionExcuseMeCath);
-							} else if (getScenes()->checkPosition(kSceneNone, SceneManager::kCheckPositionLookingDown) || getScenes()->checkCurrentPosition(false)){
+							} else if (getScenes()->checkPosition(kSceneNone, SceneManager::kCheckPositionLookingDown) || getScenes()->checkCurrentPosition(false)) {
 								 getSavePoints()->push(kEntityPlayer, entity, kActionExcuseMe);
 
 								 if (getScenes()->checkCurrentPosition(false))

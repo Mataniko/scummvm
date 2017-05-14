@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -22,9 +22,7 @@
 
 
 #include "audio/midiparser.h"
-#include "audio/mididrv.h"
 #include "common/textconsole.h"
-#include "common/util.h"
 
 namespace Scumm {
 
@@ -62,13 +60,13 @@ void MidiParser_RO::parseNextEvent (EventInfo &info) {
 
 	info.delta = 0;
 	do {
-		info.start = _position._play_pos;
-		info.event = *(_position._play_pos++);
+		info.start = _position._playPos;
+		info.event = *(_position._playPos++);
 		if (info.command() == 0xA) {
 			++_lastMarkerCount;
 			info.event = 0xF0;
 		} else if (info.event == 0xF0 || info.event == 0xF1) {
-			byte delay = *(_position._play_pos++);
+			byte delay = *(_position._playPos++);
 			info.delta += delay;
 			if (info.event == 0xF1) {
 				// This event is, as far as we have been able
@@ -95,16 +93,16 @@ void MidiParser_RO::parseNextEvent (EventInfo &info) {
 	if (info.event < 0x80)
 		return;
 
-	_position._running_status = info.event;
+	_position._runningStatus = info.event;
 	switch (info.command()) {
 	case 0xC:
-		info.basic.param1 = *(_position._play_pos++);
+		info.basic.param1 = *(_position._playPos++);
 		info.basic.param2 = 0;
 		break;
 
 	case 0x8: case 0x9: case 0xB:
-		info.basic.param1 = *(_position._play_pos++);
-		info.basic.param2 = *(_position._play_pos++);
+		info.basic.param1 = *(_position._playPos++);
+		info.basic.param2 = *(_position._playPos++);
 		if (info.command() == 0x9 && info.basic.param2 == 0)
 			info.event = info.channel() | 0x80;
 		info.length = 0;
@@ -133,7 +131,7 @@ bool MidiParser_RO::loadMusic (byte *data, uint32 size) {
 		return false;
 	}
 
-	_num_tracks = 1;
+	_numTracks = 1;
 	_ppqn = 120;
 	_tracks[0] = pos + 2;
 	_markerCount = _lastMarkerCount = 0;

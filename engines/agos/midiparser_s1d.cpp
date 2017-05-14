@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -35,7 +35,7 @@ namespace AGOS {
 class MidiParser_S1D : public MidiParser {
 private:
 	byte *_data;
-	bool _no_delta;
+	bool _noDelta;
 
 	struct Loop {
 		uint16 timer;
@@ -49,7 +49,7 @@ protected:
 	void resetTracking();
 
 public:
-	MidiParser_S1D() : _data(0), _no_delta(false) {}
+	MidiParser_S1D() : _data(0), _noDelta(false) {}
 
 	bool loadMusic(byte *data, uint32 size);
 };
@@ -75,14 +75,14 @@ void MidiParser_S1D::chainEvent(EventInfo &info) {
 }
 
 void MidiParser_S1D::parseNextEvent(EventInfo &info) {
-	info.start = _position._play_pos;
+	info.start = _position._playPos;
 	info.length = 0;
-	info.delta = _no_delta ? 0 : readVLQ2(_position._play_pos);
-	_no_delta = false;
+	info.delta = _noDelta ? 0 : readVLQ2(_position._playPos);
+	_noDelta = false;
 
-	info.event = *_position._play_pos++;
+	info.event = *_position._playPos++;
 	if (!(info.event & 0x80)) {
-		_no_delta = true;
+		_noDelta = true;
 		info.event |= 0x80;
 	}
 
@@ -94,34 +94,43 @@ void MidiParser_S1D::parseNextEvent(EventInfo &info) {
 	} else {
 		switch (info.command()) {
 		case 0x8: // note off
-			info.basic.param1 = *_position._play_pos++;
+			info.basic.param1 = *_position._playPos++;
 			info.basic.param2 = 0;
 			break;
 
 		case 0x9: // note on
-			info.basic.param1 = *_position._play_pos++;
-			info.basic.param2 = *_position._play_pos++;
+			info.basic.param1 = *_position._playPos++;
+			info.basic.param2 = *_position._playPos++;
+			// Rewrite note on events with velocity 0 as note off events.
+			// This is the actual meaning of this, but theoretically this
+			// should not need to be rewritten, since all MIDI devices should
+			// interpret it like that. On the other hand all our MidiParser
+			// implementations do it and there seems to be code in MidiParser
+			// which relies on this for tracking active notes.
+			if (info.basic.param2 == 0) {
+				info.event = info.channel() | 0x80;
+			}
 			break;
 
 		case 0xA: { // loop control
 			// In case the stop mode(?) is set to 0x80 this will stop the
 			// track over here.
 
-			const int16 loopIterations = int8(*_position._play_pos++);
+			const int16 loopIterations = int8(*_position._playPos++);
 			if (!loopIterations) {
-				_loops[info.channel()].start = _position._play_pos;
+				_loops[info.channel()].start = _position._playPos;
 			} else {
 				if (!_loops[info.channel()].timer) {
 					if (_loops[info.channel()].start) {
 						_loops[info.channel()].timer = uint16(loopIterations);
-						_loops[info.channel()].end = _position._play_pos;
+						_loops[info.channel()].end = _position._playPos;
 
 						// Go to the start of the loop
-						_position._play_pos = _loops[info.channel()].start;
+						_position._playPos = _loops[info.channel()].start;
 					}
 				} else {
 					if (_loops[info.channel()].timer)
-						_position._play_pos = _loops[info.channel()].start;
+						_position._playPos = _loops[info.channel()].start;
 					--_loops[info.channel()].timer;
 				}
 			}
@@ -141,13 +150,13 @@ void MidiParser_S1D::parseNextEvent(EventInfo &info) {
 			break;
 
 		case 0xC: // program change
-			info.basic.param1 = *_position._play_pos++;
+			info.basic.param1 = *_position._playPos++;
 			info.basic.param2 = 0;
 			break;
 
 		case 0xD: // jump to loop end
 			if (_loops[info.channel()].end)
-				_position._play_pos = _loops[info.channel()].end;
+				_position._playPos = _loops[info.channel()].end;
 
 			// We need to read the next midi event here. Since we can not
 			// safely pass this event to the MIDI event processing.
@@ -170,15 +179,46 @@ void MidiParser_S1D::parseNextEvent(EventInfo &info) {
 bool MidiParser_S1D::loadMusic(byte *data, uint32 size) {
 	unloadMusic();
 
+	if (!size)
+		return false;
+
 	// The original actually just ignores the first two bytes.
 	byte *pos = data;
-	if (*(pos++) != 0xFC)
-		debug(1, "Expected 0xFC header but found 0x%02X instead", (int) *pos);
+	if (*pos == 0xFC) {
+		// SysEx found right at the start
+		// this seems to happen since Elvira 2, we ignore it
+		// 3rd byte after the SysEx seems to be saved into a global
 
-	pos += 1;
+		// We expect at least 4 bytes in total
+		if (size < 4)
+			return false;
+
+		byte skipOffset = pos[2]; // get second byte after the SysEx
+		// pos[1] seems to have been ignored
+		// pos[3] is saved into a global inside the original interpreters
+
+		// Waxworks + Simon 1 demo typical header is:
+		//  0xFC 0x29 0x07 0x01 [0x00/0x01]
+		// Elvira 2 typical header is:
+		//  0xFC 0x04 0x06 0x06
+
+		if (skipOffset >= 6) {
+			// should be at least 6, so that we skip over the 2 size bytes and the
+			// smallest SysEx possible
+			skipOffset -= 2; // 2 size bytes were already read by previous code outside of this method
+
+			if (size <= skipOffset) // Skip to the end of file? -> something is not correct
+				return false;
+
+			// Do skip over the bytes
+			pos += skipOffset;
+		} else {
+			warning("MidiParser_S1D: unexpected skip offset in music file");
+		}
+	}
 
 	// And now we're at the actual data. Only one track.
-	_num_tracks = 1;
+	_numTracks = 1;
 	_data = pos;
 	_tracks[0] = pos;
 
@@ -194,7 +234,7 @@ bool MidiParser_S1D::loadMusic(byte *data, uint32 size) {
 void MidiParser_S1D::resetTracking() {
 	MidiParser::resetTracking();
 	// The first event never contains any delta.
-	_no_delta = true;
+	_noDelta = true;
 	memset(_loops, 0, sizeof(_loops));
 }
 

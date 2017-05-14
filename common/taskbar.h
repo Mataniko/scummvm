@@ -34,7 +34,7 @@ namespace Common {
  * The TaskbarManager allows interaction with the ScummVM application icon:
  *  - in the taskbar on Windows 7 and later
  *  - in the launcher for Unity
- *  - in the dock on MacOSX
+ *  - in the dock on Mac OS X
  *  - ...
  *
  * This allows GUI code and engines to display a progress bar, an overlay icon and/or count
@@ -123,7 +123,7 @@ public:
 	virtual void addRecent(const String &name, const String &description) {}
 
 	/**
-	 * Notifies the user an error occured through the taskbar icon
+	 * Notifies the user an error occurred through the taskbar icon
 	 *
 	 * This will for example show the taskbar icon as red (using progress of 100% and an error state)
 	 * on Windows, and set the launcher icon in the urgent state on Unity
@@ -136,7 +136,7 @@ public:
 	virtual void clearError() {}
 };
 
-}	// End of namespace Common
+} // End of namespace Common
 
 #endif
 

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -51,6 +51,8 @@ public:
 	bool has(Variables *variables, uint8 startEnv = 0, int16 except = -1) const;
 	bool has(Script    *script   , uint8 startEnv = 0, int16 except = -1) const;
 	bool has(Resources *resources, uint8 startEnv = 0, int16 except = -1) const;
+
+	void deleted(Variables *variables);
 
 	void clear();
 
@@ -168,6 +170,8 @@ public:
 
 	void totSub(int8 flags, const Common::String &totFile);
 	void switchTotSub(int16 index, int16 function);
+
+	void deletedVars(Variables *variables);
 
 	bool loadFunctions(const Common::String &tot, uint16 flags);
 	bool callFunction(const Common::String &tot, const Common::String &function, int16 param);

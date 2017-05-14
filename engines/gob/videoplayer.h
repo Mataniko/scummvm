@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -29,10 +29,13 @@
 #include "common/str.h"
 
 #include "graphics/surface.h"
-#include "video/coktel_decoder.h"
 
 #include "gob/util.h"
 #include "gob/draw.h"
+
+namespace Video {
+class CoktelDecoder;
+}
 
 namespace Gob {
 
@@ -110,6 +113,9 @@ public:
 	void closeLiveSound();
 	void closeAll();
 
+	bool reopenVideo(int slot = 0);
+	bool reopenAll();
+
 	void pauseVideo(int slot, bool pause);
 	void pauseAll(bool pause);
 
@@ -163,6 +169,8 @@ private:
 
 		bool isEmpty() const;
 		void close();
+
+		void reopen();
 	};
 
 	static const int kVideoSlotCount = 32;
@@ -187,6 +195,8 @@ private:
 	Common::String findFile(const Common::String &file, Properties &properties);
 
 	::Video::CoktelDecoder *openVideo(const Common::String &file, Properties &properties);
+
+	bool reopenVideo(Video &video);
 
 	bool playFrame(int slot, Properties &properties);
 

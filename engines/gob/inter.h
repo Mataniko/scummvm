@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -30,6 +30,10 @@
 #include "gob/variables.h"
 #include "gob/iniconfig.h"
 #include "gob/databases.h"
+
+namespace Common {
+	class PEResources;
+}
 
 namespace Gob {
 
@@ -138,8 +142,9 @@ protected:
 
 	VariableStack _varStack;
 
-	// The busy-wait detection in o1_keyFunc breaks fast scrolling in Ween
-	bool _noBusyWait;
+	// Busy-wait detection
+	bool   _noBusyWait;
+	uint32 _lastBusyWait;
 
 	GobEngine *_vm;
 
@@ -168,6 +173,8 @@ protected:
 	void storeString(const char *value);
 
 	uint32 readValue(uint16 index, uint16 type);
+
+	void handleBusyWait();
 };
 
 class Inter_v1 : public Inter {
@@ -432,6 +439,7 @@ protected:
 	void o2_animPalInit(OpFuncParams &params);
 	void o2_addHotspot(OpFuncParams &params);
 	void o2_removeHotspot(OpFuncParams &params);
+	void o2_getTotTextItemPart(OpFuncParams &params);
 	void o2_goblinFunc(OpFuncParams &params);
 	void o2_stopSound(OpFuncParams &params);
 	void o2_loadSound(OpFuncParams &params);
@@ -509,6 +517,20 @@ protected:
 	void oFascin_setWinFlags();
 };
 
+class Inter_LittleRed : public Inter_v2 {
+public:
+	Inter_LittleRed(GobEngine *vm);
+	virtual ~Inter_LittleRed() {}
+
+protected:
+	virtual void setupOpcodesDraw();
+	virtual void setupOpcodesFunc();
+	virtual void setupOpcodesGob();
+
+	void oLittleRed_keyFunc(OpFuncParams &params);
+	void oLittleRed_playComposition(OpFuncParams &params);
+};
+
 class Inter_v3 : public Inter_v2 {
 public:
 	Inter_v3(GobEngine *vm);
@@ -519,7 +541,6 @@ protected:
 	virtual void setupOpcodesFunc();
 	virtual void setupOpcodesGob();
 
-	void o3_getTotTextItemPart(OpFuncParams &params);
 	void o3_speakerOn(OpFuncParams &params);
 	void o3_speakerOff(OpFuncParams &params);
 	void o3_copySprite(OpFuncParams &params);
@@ -648,7 +669,7 @@ private:
 class Inter_v7 : public Inter_Playtoons {
 public:
 	Inter_v7(GobEngine *vm);
-	virtual ~Inter_v7() {}
+	virtual ~Inter_v7();
 
 protected:
 	virtual void setupOpcodesDraw();
@@ -672,7 +693,7 @@ protected:
 	void o7_zeroVar();
 	void o7_getINIValue();
 	void o7_setINIValue();
-	void o7_loadLBMPalette();
+	void o7_loadIFFPalette();
 	void o7_opendBase();
 	void o7_closedBase();
 	void o7_getDBString();
@@ -684,7 +705,12 @@ private:
 	INIConfig _inis;
 	Databases _databases;
 
+	Common::PEResources *_cursors;
+
 	Common::String findFile(const Common::String &mask);
+
+	bool loadCursorFile();
+	void resizeCursors(int16 width, int16 height, int16 count, bool transparency);
 };
 
 } // End of namespace Gob

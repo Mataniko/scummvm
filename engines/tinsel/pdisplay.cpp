@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -23,9 +23,9 @@
  * PointProcess()
  */
 
+#include "common/coroutines.h"
 #include "tinsel/actors.h"
 #include "tinsel/background.h"
-#include "tinsel/coroutine.h"
 #include "tinsel/cursor.h"
 #include "tinsel/dw.h"
 #include "tinsel/events.h"
@@ -265,7 +265,7 @@ void DisablePointing() {
 		if (hPoly != NOPOLY && PolyType(hPoly) == TAG && PolyIsPointedTo(hPoly)) {
 			SetPolyPointedTo(hPoly, false);
 			SetPolyTagWanted(hPoly, false, false, 0);
-			PolygonEvent(nullContext, hPoly, UNPOINT, 0, false, 0);
+			PolygonEvent(Common::nullContext, hPoly, UNPOINT, 0, false, 0);
 		}
 	}
 
@@ -275,7 +275,7 @@ void DisablePointing() {
 			SetActorPointedTo(i, false);
 			SetActorTagWanted(i, false, false, 0);
 
-			ActorEvent(nullContext, i, UNPOINT, false, 0);
+			ActorEvent(Common::nullContext, i, UNPOINT, false, 0);
 		}
 	}
 }

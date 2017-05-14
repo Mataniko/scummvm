@@ -22,8 +22,6 @@
 
 #include "lastexpress/game/scenes.h"
 
-#include "lastexpress/data/scene.h"
-
 #include "lastexpress/game/action.h"
 #include "lastexpress/game/beetle.h"
 #include "lastexpress/game/entities.h"
@@ -34,10 +32,8 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
 
@@ -493,7 +489,7 @@ bool SceneManager::checkCurrentPosition(bool doCheckOtherCars) const {
 	if (position == 99)
 		return true;
 
-	switch (car){
+	switch (car) {
 	default:
 		break;
 
@@ -583,7 +579,7 @@ void SceneManager::updateDoorsAndClock() {
 		for (ObjectIndex index = firstIndex; index < (ObjectIndex)(firstIndex + 8); index = (ObjectIndex)(index + 1)) {
 
 			// Doors is not open, nothing to do
-			if (getObjects()->get(index).location != kObjectLocation2)
+			if (getObjects()->get(index).status != kObjectLocation2)
 				continue;
 
 			// Load door sequence
@@ -591,8 +587,8 @@ void SceneManager::updateDoorsAndClock() {
 			Common::String name = Common::String::format("633X%c-%02d.seq", (index - firstIndex) + 65, scene->position);
 			Sequence *sequence = loadSequence1(name, 255);
 
-			// If the sequence doesn't exists, skip
-			if (!sequence || !sequence->isLoaded())
+			// If the sequence doesn't exists or could not be loaded, skip index
+			if (!sequence)
 				continue;
 
 			// Adjust frame data and store in frame list
@@ -743,24 +739,31 @@ void SceneManager::resetQueue() {
 	_queue.clear();
 }
 
+void SceneManager::setCoordinates(const Common::Rect &rect) {
+	_flagCoordinates = true;
+
+	if (_coords.right > rect.right)
+		_coords.right = rect.right;
+
+	if (_coords.bottom > rect.bottom)
+		_coords.bottom = rect.bottom;
+
+	if (_coords.left < rect.left)
+		_coords.left = rect.left;
+
+	if (_coords.top < rect.top)
+		_coords.top = rect.top;
+}
+
 void SceneManager::setCoordinates(SequenceFrame *frame) {
 
 	if (!frame || frame->getInfo()->subType == 3)
 		return;
 
-	_flagCoordinates = true;
-
-	if (_coords.right > (int)frame->getInfo()->xPos1)
-		_coords.right = (int16)frame->getInfo()->xPos1;
-
-	if (_coords.bottom > (int)frame->getInfo()->yPos1)
-		_coords.bottom = (int16)frame->getInfo()->yPos1;
-
-	if (_coords.left < (int)frame->getInfo()->xPos2)
-		_coords.left = (int16)frame->getInfo()->xPos2;
-
-	if (_coords.top < (int)frame->getInfo()->yPos2)
-		_coords.top = (int16)frame->getInfo()->yPos2;
+	setCoordinates(Common::Rect((int16)frame->getInfo()->xPos1,
+								(int16)frame->getInfo()->yPos1,
+								(int16)frame->getInfo()->xPos2,
+								(int16)frame->getInfo()->yPos2));
 }
 
 void SceneManager::resetCoordinates() {
@@ -839,11 +842,11 @@ void SceneManager::preProcessScene(SceneIndex *index) {
 		if (object >= kObjectMax)
 			break;
 
-		if (getObjects()->get(object).location == kObjectLocationNone)
+		if (getObjects()->get(object).status == kObjectLocationNone)
 			break;
 
 		for (Common::Array<SceneHotspot *>::iterator it = scene->getHotspots()->begin(); it != scene->getHotspots()->end(); ++it) {
-			if (getObjects()->get(object).location != (*it)->location)
+			if (getObjects()->get(object).status != (*it)->location)
 				continue;
 
 			PROCESS_HOTSPOT_SCENE(*it, index);
@@ -917,7 +920,7 @@ void SceneManager::preProcessScene(SceneIndex *index) {
 
 		int location = kObjectLocationNone;
 
-		if (getObjects()->get(object).location == kObjectLocation2)
+		if (getObjects()->get(object).status == kObjectLocation2)
 			location = kObjectLocation1;
 
 		if (getInventory()->get(item)->location != kObjectLocationNone)
@@ -930,7 +933,7 @@ void SceneManager::preProcessScene(SceneIndex *index) {
 			if (location != (*it)->location)
 				continue;
 
-			if (getObjects()->get(object).location != (*it)->param1)
+			if (getObjects()->get(object).status != (*it)->param1)
 				continue;
 
 			if (getInventory()->get(item)->location != (*it)->param2)
@@ -991,7 +994,7 @@ void SceneManager::preProcessScene(SceneIndex *index) {
 
 		bool found = false;
 		for (Common::Array<SceneHotspot *>::iterator it = scene->getHotspots()->begin(); it != scene->getHotspots()->end(); ++it) {
-			if (getObjects()->get(object).location2 != (*it)->location)
+			if (getObjects()->get(object).model != (*it)->location)
 				continue;
 
 			PROCESS_HOTSPOT_SCENE(*it, index);

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -78,6 +78,7 @@ struct TimeDate {
 	int tm_mday;    ///< day of month (1 - 31)
 	int tm_mon;     ///< month of year (0 - 11)
 	int tm_year;    ///< year - 1900
+	int tm_wday;    ///< days since Sunday (0 - 6)
 };
 
 namespace LogMessageType {
@@ -255,6 +256,12 @@ public:
 		kFeatureAspectRatioCorrection,
 
 		/**
+		 * If supported this flag can be used to switch between unfiltered and
+		 * filtered graphics modes.
+		 */
+		kFeatureFilteringMode,
+
+		/**
 		 * Determine whether a virtual keyboard is too be shown or not.
 		 * This would mostly be implemented by backends for hand held devices,
 		 * like PocketPC, Palms, Symbian phones like the P800, Zaurus, etc.
@@ -313,7 +320,54 @@ public:
 		 *
 		 * This feature has no associated state.
 		 */
-		kFeatureDisplayLogFile
+		kFeatureDisplayLogFile,
+
+		/**
+		 * The presence of this feature indicates whether the hasTextInClipboard()
+		 * and getTextFromClipboard() calls are supported.
+		 *
+		 * This feature has no associated state.
+		 */
+		kFeatureClipboardSupport,
+
+		/**
+		 * The presence of this feature indicates whether the openUrl()
+		 * call is supported.
+		 *
+		 * This feature has no associated state.
+		 */
+		kFeatureOpenUrl	,
+
+		/**
+		* show on-screen control
+		*/
+		kFeatureOnScreenControl,
+
+		/**
+		* mouse emulation mode
+		*/
+		kFeatureTouchpadMode,
+
+		/**
+		* swap menu and back buttons
+		*/
+		kFeatureSwapMenuAndBackButtons,
+
+		/**
+		* keyboard mouse and joystick mouse speed
+		*/
+		kFeatureKbdMouseSpeed,
+
+		/**
+		* change analog joystick deadzone
+		*/
+		kFeatureJoystickDeadzone,
+
+		/**
+		* shaders
+		*/
+		kFeatureShader
+
 	};
 
 	/**
@@ -380,33 +434,22 @@ public:
 	 *
 	 *
 	 * The next layer is the overlay. It is composed over the game
-	 * graphics. By default, it has exactly the same size and
-	 * resolution as the game graphics. However, client code can
-	 * specify an overlay scale (as an additional parameter to
-	 * initSize()). This is meant to increase the resolution of the
-	 * overlay while keeping its size the same as that of the game
-	 * graphics. For example, if the overlay scale is 2, and the game
-	 * graphics have a resolution of 320x200; then the overlay shall
-	 * have a resolution of 640x400, but it still has the same
-	 * physical size as the game graphics.
-	 * The overlay usually uses 16bpp, but on some ports, only 8bpp
-	 * are availble, so that is supported, too, via a compile time
-	 * switch (see also the OverlayColor typedef in scummsys.h).
-	 *
+	 * graphics. Historically the overlay size had always been a
+	 * multiple of the game resolution, for example when the game
+	 * resolution was 320x200 and the user selected a 2x scaler and did
+	 * not enable aspect ratio correction it had a size of 640x400.
+	 * An exception was the aspect ratio correction, which did allow
+	 * for non multiples of the vertical resolution of the game screen.
+	 * Nowadays the overlay size does not need to have any relation to
+	 * the game resolution though, for example the overlay resolution
+	 * might be the same as the physical screen resolution.
+	 * The overlay is forced to a 16bpp mode right now.
 	 *
 	 * Finally, there is the mouse layer. This layer doesn't have to
 	 * actually exist within the backend -- it all depends on how a
 	 * backend chooses to implement mouse cursors, but in the default
 	 * SDL backend, it really is a separate layer. The mouse can
 	 * have a palette of its own, if the backend supports it.
-	 * The scale of the mouse cursor is called 'cursorTargetScale'.
-	 * This is meant as a hint to the backend. For example, let us
-	 * assume the overlay is not visible, and the game graphics are
-	 * displayed using a 2x scaler. If a mouse cursor with a
-	 * cursorTargetScale of 1 is set, then it should be scaled by
-	 * factor 2x, too, just like the game graphics. But if it has a
-	 * cursorTargetScale of 2, then it shouldn't be scaled again by
-	 * the game graphics scaler.
 	 *
 	 * On a note for OSystem users here. We do not require our graphics
 	 * to be thread safe and in fact most/all backends using OpenGL are
@@ -535,6 +578,34 @@ public:
 #endif
 
 	/**
+	 * Retrieve a list of all hardware shaders supported by this backend.
+	 * This can be only hardware shaders.
+	 * it is completely up to the backend maintainer to decide what is
+	 * appropriate here and what not.
+	 * The list is terminated by an all-zero entry.
+	 * @return a list of supported shaders
+	 */
+	virtual const GraphicsMode *getSupportedShaders() const {
+		static const OSystem::GraphicsMode no_shader[2] = {{"NONE", "Normal (no shader)", 0}, {0, 0, 0}};
+		return no_shader;
+	}
+
+	/**
+	 * Switch to the specified shader mode. If switching to the new mode
+	 * failed, this method returns false.
+	 *
+	 * @param mode	the ID of the new shader mode
+	 * @return true if the switch was successful, false otherwise
+	 */
+	virtual bool setShader(int id) { return false; }
+
+	/**
+	 * Determine which shader is currently active.
+	 * @return the ID of the active shader
+	 */
+	virtual int getShader() const { return 0; }
+
+	/**
 	 * Set the size and color format of the virtual screen. Typical sizes include:
 	 *  - 320x200 (e.g. for most SCUMM games, and Simon)
 	 *  - 320x240 (e.g. for FM-TOWN SCUMM games)
@@ -610,7 +681,8 @@ public:
 		kTransactionFullscreenFailed = (1 << 1),	/**< Failed switching fullscreen mode */
 		kTransactionModeSwitchFailed = (1 << 2),	/**< Failed switching the GFX graphics mode (setGraphicsMode) */
 		kTransactionSizeChangeFailed = (1 << 3),	/**< Failed switching the screen dimensions (initSize) */
-		kTransactionFormatNotSupported = (1 << 4)	/**< Failed setting the color format */
+		kTransactionFormatNotSupported = (1 << 4),	/**< Failed setting the color format */
+		kTransactionFilteringFailed = (1 << 5)		/**< Failed setting the filtering mode */
 	};
 
 	/**
@@ -668,7 +740,7 @@ public:
 	 * @see updateScreen
 	 * @see getScreenFormat
 	 */
-	virtual void copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) = 0;
+	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) = 0;
 
 	/**
 	 * Lock the active screen framebuffer and return a Graphics::Surface
@@ -758,13 +830,11 @@ public:
 	 * In order to be able to display dialogs atop the game graphics, backends
 	 * must provide an overlay mode.
 	 *
-	 * The overlay can be 8 or 16 bpp. Depending on which it is, OverlayColor
-	 * is 8 or 16 bit.
+	 * The overlay is currently forced at 16 bpp.
 	 *
 	 * For 'coolness' we usually want to have an overlay which is blended over
 	 * the game graphics. On backends which support alpha blending, this is
-	 * no issue; but on other systems (in particular those which only support
-	 * 8bpp), this needs some trickery.
+	 * no issue; but on other systems this needs some trickery.
 	 *
 	 * Essentially, we fake (alpha) blending on these systems by copying the
 	 * current game graphics into the overlay buffer when activating the overlay,
@@ -803,20 +873,14 @@ public:
 	 * Copy the content of the overlay into a buffer provided by the caller.
 	 * This is only used to implement fake alpha blending.
 	 */
-	virtual void grabOverlay(OverlayColor *buf, int pitch) = 0;
+	virtual void grabOverlay(void *buf, int pitch) = 0;
 
 	/**
 	 * Blit a graphics buffer to the overlay.
 	 * In a sense, this is the reverse of grabOverlay.
 	 *
-	 * @note The pitch parameter actually contains the 'pixel pitch', i.e.,
-	 * the number of pixels per scanline, and not as usual the number of bytes
-	 * per scanline.
-	 *
-	 * @todo Change 'pitch' to be byte and not pixel based
-	 *
 	 * @param buf		the buffer containing the graphics data source
-	 * @param pitch		the pixel pitch of the buffer (number of pixels in a scanline)
+	 * @param pitch		the pitch of the buffer (number of bytes in a scanline)
 	 * @param x			the x coordinate of the destination rectangle
 	 * @param y			the y coordinate of the destination rectangle
 	 * @param w			the width of the destination rectangle
@@ -825,7 +889,7 @@ public:
 	 * @see copyRectToScreen
 	 * @see grabOverlay
 	 */
-	virtual void copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) = 0;
+	virtual void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) = 0;
 
 	/**
 	 * Return the height of the overlay.
@@ -883,10 +947,11 @@ public:
 	 * @param keycolor			transparency color value. This should not exceed the maximum color value of the specified format.
 	 *                          In case it does the behavior is undefined. The backend might just error out or simply ignore the
 	 *                          value. (The SDL backend will just assert to prevent abuse of this).
-	 * @param cursorTargetScale	scale factor which cursor is designed for
+	 * @param dontScale			Whether the cursor should never be scaled. An exception are high ppi displays, where the cursor
+	 *                          would be too small to notice otherwise, these are allowed to scale the cursor anyway.
 	 * @param format			pointer to the pixel format which cursor graphic uses (0 means CLUT8)
 	 */
-	virtual void setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, int cursorTargetScale = 1, const Graphics::PixelFormat *format = NULL) = 0;
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL) = 0;
 
 	/**
 	 * Replace the specified range of cursor the palette with new colors.
@@ -907,8 +972,14 @@ public:
 	/** @name Events and Time */
 	//@{
 
-	/** Get the number of milliseconds since the program was started. */
-	virtual uint32 getMillis() = 0;
+	/** Get the number of milliseconds since the program was started.
+
+	    @param skipRecord   Skip recording of this value by event recorder.
+	    			This could be needed particularly when we are in
+				an on-screen GUI loop where player can pause
+				the recording.
+	*/
+	virtual uint32 getMillis(bool skipRecord = false) = 0;
 
 	/** Delay/sleep for the specified amount of milliseconds. */
 	virtual void delayMillis(uint msecs) = 0;
@@ -924,9 +995,7 @@ public:
 	 * Return the timer manager singleton. For more information, refer
 	 * to the TimerManager documentation.
 	 */
-	inline Common::TimerManager *getTimerManager() {
-		return _timerManager;
-	}
+	virtual Common::TimerManager *getTimerManager();
 
 	/**
 	 * Return the event manager singleton. For more information, refer
@@ -1099,13 +1168,30 @@ public:
 	virtual void displayMessageOnOSD(const char *msg) = 0;
 
 	/**
+	 * Display an icon indicating background activity
+	 *
+	 * The icon is displayed in an 'on screen display'. It is visible above
+	 * the regular screen content or near it.
+	 *
+	 * The caller keeps ownership of the icon. It is acceptable to free
+	 * the surface just after the call.
+	 *
+	 * There is no preferred pixel format for the icon. The backend should
+	 * convert its copy of the icon to an appropriate format.
+	 *
+	 * The caller must call this method again with a null pointer
+	 * as a parameter to indicate the icon should no longer be displayed.
+	 *
+	 * @param icon the icon to display on screen
+	 */
+	virtual void displayActivityIconOnOSD(const Graphics::Surface *icon) = 0;
+
+	/**
 	 * Return the SaveFileManager, used to store and load savestates
 	 * and other modifiable persistent game data. For more information,
 	 * refer to the SaveFileManager documentation.
 	 */
-	inline Common::SaveFileManager *getSavefileManager() {
-		return _savefileManager;
-	}
+	virtual Common::SaveFileManager *getSavefileManager();
 
 #if defined(USE_TASKBAR)
 	/**
@@ -1213,6 +1299,42 @@ public:
 	 * might for example require leaving fullscreen mode.
 	 */
 	virtual bool displayLogFile() { return false; }
+
+	/**
+	 * Returns whether there is text available in the clipboard.
+	 *
+	 * The kFeatureClipboardSupport feature flag can be used to
+	 * test whether this call has been implemented by the active
+	 * backend.
+	 *
+	 * @return true if there is text in the clipboard, false otherwise
+	 */
+	virtual bool hasTextInClipboard() { return false; }
+
+	/**
+	 * Returns clipboard contents as a String.
+	 *
+	 * The kFeatureClipboardSupport feature flag can be used to
+	 * test whether this call has been implemented by the active
+	 * backend.
+	 *
+	 * @return clipboard contents ("" if hasTextInClipboard() == false)
+	 */
+	virtual Common::String getTextFromClipboard() { return ""; }
+
+	/**
+	 * Open the given Url in the default browser (if available on the target
+	 * system).
+	 *
+	 * @return true on success, false otherwise.
+	 *
+	 * @note It is up to the backend to ensure that the system is in a state
+	 * that allows the user to actually see the web page. This might for
+	 * example require leaving fullscreen mode.
+	 *
+	 * @parem url the URL to open
+	 */
+	virtual bool openUrl(const Common::String &url) {return false; }
 
 	/**
 	 * Returns the locale of the system.

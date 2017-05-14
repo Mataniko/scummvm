@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -35,10 +35,8 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/lastexpress.h"
-#include "lastexpress/helpers.h"
 
 namespace LastExpress {
 
@@ -48,7 +46,7 @@ Vassili::Vassili(LastExpressEngine *engine) : Entity(engine, kEntityVassili) {
 	ADD_CALLBACK_FUNCTION(Vassili, savegame);
 	ADD_CALLBACK_FUNCTION(Vassili, chapter1);
 	ADD_CALLBACK_FUNCTION(Vassili, chapter1Handler);
-	ADD_CALLBACK_FUNCTION(Vassili, function6);
+	ADD_CALLBACK_FUNCTION(Vassili, inBed);
 	ADD_CALLBACK_FUNCTION(Vassili, function7);
 	ADD_CALLBACK_FUNCTION(Vassili, function8);
 	ADD_CALLBACK_FUNCTION(Vassili, function9);
@@ -85,7 +83,7 @@ IMPLEMENT_FUNCTION(4, Vassili, chapter1)
 		break;
 
 	case kActionNone:
-		TIME_CHECK(kTimeChapter1, params->param1, setup_chapter1Handler);
+		Entity::timeCheck(kTimeChapter1, params->param1, WRAP_SETUP_FUNCTION(Vassili, setup_chapter1Handler));
 		break;
 
 	case kActionDefault:
@@ -114,7 +112,7 @@ IMPLEMENT_FUNCTION(5, Vassili, chapter1Handler)
 					break;
 			}
 
-			if (!params->param2 && getObjects()->get(kObjectCompartmentA).location == kObjectLocation1) {
+			if (!params->param2 && getObjects()->get(kObjectCompartmentA).status == kObjectLocation1) {
 				params->param2 = 1;
 				getEntities()->drawSequenceLeft(kEntityVassili, "303A");
 				getObjects()->update(kObjectCompartmentA, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
@@ -128,7 +126,7 @@ IMPLEMENT_FUNCTION(5, Vassili, chapter1Handler)
 		break;
 
 	case kAction122732000:
-		setup_function6();
+		setup_inBed();
 		break;
 
 	case kAction168459827:
@@ -139,14 +137,15 @@ IMPLEMENT_FUNCTION(5, Vassili, chapter1Handler)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(6, Vassili, function6)
+IMPLEMENT_FUNCTION(6, Vassili, inBed)
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
 		if (getEntities()->isInsideCompartment(kEntityPlayer, kCarRedSleeping, kPosition_8200)) {
-			UPDATE_PARAM_GOTO(params->param3, getState()->timeTicks, params->param1, label_function7);
+			if (!Entity::updateParameter(params->param3, getState()->timeTicks, params->param1))
+				goto label_function7;
 
 			setCallback(1);
 			setup_draw("303B");
@@ -290,7 +289,7 @@ IMPLEMENT_FUNCTION(9, Vassili, function9)
 
 	case kActionDefault:
 	case kActionDrawScene:
-		if ((getObjects()->get(kObjectCompartmentA).location == kObjectLocation2 && getEntities()->isPlayerPosition(kCarRedSleeping, 17))
+		if ((getObjects()->get(kObjectCompartmentA).status == kObjectLocation2 && getEntities()->isPlayerPosition(kCarRedSleeping, 17))
 		|| getEntities()->isPlayerPosition(kCarRedSleeping, 18)
 		|| getEntities()->isPlayerPosition(kCarRedSleeping, 37)
 		|| getEntities()->isPlayerPosition(kCarRedSleeping, 38)
@@ -389,7 +388,7 @@ IMPLEMENT_FUNCTION(12, Vassili, chapter2)
 		getData()->inventoryItem = kItemNone;
 
 		getObjects()->update(kObjectCompartmentA, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
-		getObjects()->updateLocation2(kObjectCompartmentA, kObjectLocation1);
+		getObjects()->updateModel(kObjectCompartmentA, kObjectModel1);
 		break;
 	}
 IMPLEMENT_FUNCTION_END
@@ -402,7 +401,8 @@ IMPLEMENT_FUNCTION(13, Vassili, sleeping)
 
 	case kActionNone:
 		if (getEntities()->isInsideCompartment(kEntityPlayer, kCarRedSleeping, kPosition_8200)) {
-			UPDATE_PARAM(params->param3, getState()->timeTicks, params->param1);
+			if (!Entity::updateParameter(params->param3, getState()->timeTicks, params->param1))
+				break;
 
 			setCallback(1);
 			setup_draw("303B");
@@ -461,7 +461,8 @@ IMPLEMENT_FUNCTION(15, Vassili, stealEgg)
 
 	case kActionNone:
 		if (getEntities()->isInsideCompartment(kEntityPlayer, kCarRedSleeping, kPosition_8200)) {
-			UPDATE_PARAM(params->param3, getState()->timeTicks, params->param1);
+			if (!Entity::updateParameter(params->param3, getState()->timeTicks, params->param1))
+				break;
 
 			setCallback(1);
 			setup_draw("303B");
@@ -531,7 +532,7 @@ IMPLEMENT_FUNCTION(16, Vassili, chapter4)
 		getData()->inventoryItem = kItemNone;
 
 		getObjects()->update(kObjectCompartmentA, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
-		getObjects()->updateLocation2(kObjectCompartmentA, kObjectLocation1);
+		getObjects()->updateModel(kObjectCompartmentA, kObjectModel1);
 		break;
 	}
 IMPLEMENT_FUNCTION_END
@@ -545,7 +546,8 @@ IMPLEMENT_FUNCTION(17, Vassili, chapter4Handler)
 
 	case kActionNone:
 		if (getEntities()->isInsideCompartment(kEntityPlayer, kCarRedSleeping, kPosition_8200)) {
-			UPDATE_PARAM(params->param3, getState()->timeTicks, params->param1);
+			if (!Entity::updateParameter(params->param3, getState()->timeTicks, params->param1))
+				break;
 
 			setCallback(1);
 			setup_draw("303B");

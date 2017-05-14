@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -80,7 +80,8 @@ enum SoundFlag {
 	kFlagMusic       = 0x5000010,
 	kFlagType3       = 0x6000000,
 	kFlagLoop        = 0x6001008,
-	kFlagType9       = 0x7000000
+	kFlagType9       = 0x7000000,
+	kFlagNIS         = 0x7002010
 };
 
 enum SoundState {
@@ -754,7 +755,7 @@ enum ClothesIndex {
 };
 
 //////////////////////////////////////////////////////////////////////////
-// Location of objects
+// Objects (doors)
 //////////////////////////////////////////////////////////////////////////
 enum ObjectLocation {
 	kObjectLocationNone = 0,
@@ -762,13 +763,27 @@ enum ObjectLocation {
 	kObjectLocation2    = 2, // Bed ?
 	kObjectLocation3    = 3,
 	kObjectLocation4    = 4, // Window ?
-	kObjectLocation5    = 5,
-	kObjectLocation6    = 6,
-	kObjectLocation7    = 7,
-	kObjectLocation8    = 8,
-	kObjectLocation9    = 9,
-	kObjectLocation10   = 10,
-	kObjectLocation18   = 18
+	kObjectLocation5 = 5,
+	kObjectLocation6 = 6,
+	kObjectLocation7 = 7,
+	kObjectLocation8 = 8,
+	kObjectLocation9 = 9,
+	kObjectLocation10 = 10,
+	kObjectLocation18 = 18
+};
+
+enum ObjectModel {
+	kObjectModelNone = 0,
+	kObjectModel1    = 1,
+	kObjectModel2    = 2,
+	kObjectModel3    = 3,
+	kObjectModel4    = 4,
+	kObjectModel5    = 5,
+	kObjectModel6    = 6,
+	kObjectModel7    = 7,
+	kObjectModel8    = 8,
+	kObjectModel9    = 9,
+	kObjectModel10   = 10
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -991,8 +1006,8 @@ enum EntityIndex {
 	kEntityMertens,
 	kEntityCoudert,
 	kEntityPascale,             // 5
-	kEntityServers0,
-	kEntityServers1,
+	kEntityWaiter1,
+	kEntityWaiter2,
 	kEntityCooks,
 	kEntityVerges,
 	kEntityTatiana,             // 10
@@ -1394,7 +1409,7 @@ enum ActionIndex {
 	kAction169032608 = 169032608,
 	kAction189426612 = 189426612,
 	kAction203859488 = 203859488,
-	kAction219522616 = 219522616,    // Servers0
+	kAction219522616 = 219522616,    // Waiter1
 	kAction225182640 = 225182640,
 	kAction235257824 = 235257824,
 
@@ -1505,7 +1520,7 @@ enum ActionIndex {
 	kAction71277948  = 71277948,
 	kAction158007856 = 158007856,
 	kAction101687594 = 101687594,
-	kAction122358304 = 122358304,    // also Servers1/Boutarel?
+	kAction122358304 = 122358304,    // also Waiter2/Boutarel?
 	kActionMaxFreeFromCage = 135204609,
 	kAction156622016 = 156622016,
 
@@ -1731,62 +1746,6 @@ enum ActionIndex {
 
 	kActionEnd
 };
-
-//////////////////////////////////////////////////////////////////////////
-// Functors classes used by the engine
-//////////////////////////////////////////////////////////////////////////
-
-// FIXME is this achievable with the existing Functor1Mem function
-template<class Arg, class Res, class T>
-class Functor1MemConst : public Common::Functor1<Arg, Res> {
-public:
-	typedef Res (T::*FuncType)(Arg) const;
-
-	Functor1MemConst(T *t, const FuncType &func) : _t(t), _func(func) {}
-
-	bool isValid() const { return _func != 0 && _t != 0; }
-	Res operator()(Arg v1) const {
-		return (_t->*_func)(v1);
-	}
-private:
-	mutable T *_t;
-	const FuncType _func;
-};
-
-// FIXME move this to existing func.h file
-template<class Arg1, class Arg2, class Arg3, class Arg4, class Result>
-struct QuaternaryFunction {
-	typedef Arg1 FirstArgumentType;
-	typedef Arg2 SecondArgumentType;
-	typedef Arg3 ThirdArgumentType;
-	typedef Arg4 FourthArgumentType;
-	typedef Result ResultType;
-};
-
-template<class Arg1, class Arg2, class Arg3, class Arg4, class Res>
-struct Functor4 : public QuaternaryFunction<Arg1, Arg2, Arg3, Arg4, Res> {
-	virtual ~Functor4() {}
-
-	virtual bool isValid() const = 0;
-	virtual Res operator()(Arg1, Arg2, Arg3, Arg4) const = 0;
-};
-
-template<class Arg1, class Arg2, class Arg3, class Arg4, class Res, class T>
-class Functor4Mem : public Functor4<Arg1, Arg2, Arg3, Arg4, Res> {
-public:
-	typedef Res (T::*FuncType)(Arg1, Arg2, Arg3, Arg4);
-
-	Functor4Mem(T *t, const FuncType &func) : _t(t), _func(func) {}
-
-	bool isValid() const { return _func != 0 && _t != 0; }
-	Res operator()(Arg1 v1, Arg2 v2, Arg3 v3, Arg4 v4) const {
-		return (_t->*_func)(v1, v2, v3, v4);
-	}
-private:
-	mutable T *_t;
-	const FuncType _func;
-};
-
 
 } // End of namespace LastExpress
 

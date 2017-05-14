@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -31,6 +31,8 @@ SoundBlaster::SoundBlaster(Audio::Mixer &mixer) : SoundMixer(mixer, Audio::Mixer
 	_compositionSamples = 0;
 	_compositionSampleCount = 0;
 	_compositionPos = -1;
+
+	_compositionRepCount = 0;
 }
 
 SoundBlaster::~SoundBlaster() {
@@ -47,6 +49,8 @@ void SoundBlaster::stopSound(int16 fadeLength, SoundDesc *sndDesc) {
 	if (sndDesc && (sndDesc != _curSoundDesc))
 		return;
 
+	_compositionRepCount = 0;
+
 	if (fadeLength <= 0)
 		_curSoundDesc = 0;
 
@@ -62,6 +66,7 @@ void SoundBlaster::stopComposition() {
 
 void SoundBlaster::endComposition() {
 	_compositionPos = -1;
+	_compositionRepCount = 0;
 }
 
 void SoundBlaster::nextCompositionPos() {
@@ -79,10 +84,11 @@ void SoundBlaster::nextCompositionPos() {
 		if (_compositionPos == 49)
 			_compositionPos = -1;
 	}
+
 	_compositionPos = -1;
 }
 
-void SoundBlaster::playComposition(int16 *composition, int16 freqVal,
+void SoundBlaster::playComposition(const int16 *composition, int16 freqVal,
 		SoundDesc *sndDescs, int8 sndCount) {
 
 	_compositionSamples = sndDescs;
@@ -92,10 +98,14 @@ void SoundBlaster::playComposition(int16 *composition, int16 freqVal,
 	do {
 		i++;
 		_composition[i] = composition[i];
-	} while ((i < 50) && (composition[i] != -1));
+	} while ((i < 49) && (composition[i] != -1));
 
 	_compositionPos = -1;
 	nextCompositionPos();
+}
+
+void SoundBlaster::repeatComposition(int32 repCount) {
+	_compositionRepCount = repCount;
 }
 
 void SoundBlaster::setSample(SoundDesc &sndDesc, int16 repCount, int16 frequency,
@@ -106,10 +116,21 @@ void SoundBlaster::setSample(SoundDesc &sndDesc, int16 repCount, int16 frequency
 }
 
 void SoundBlaster::checkEndSample() {
-	if (_compositionPos != -1)
+	if (_compositionPos != -1) {
 		nextCompositionPos();
-	else
-		SoundMixer::checkEndSample();
+		return;
+	}
+
+	if (_compositionRepCount != 0) {
+		if (_compositionRepCount > 0)
+			_compositionRepCount--;
+
+		nextCompositionPos();
+		if (_compositionPos != -1)
+			return;
+	}
+
+	SoundMixer::checkEndSample();
 }
 
 void SoundBlaster::endFade() {

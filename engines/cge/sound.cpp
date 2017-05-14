@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -30,8 +30,10 @@
 #include "cge/cge_main.h"
 #include "common/config-manager.h"
 #include "common/memstream.h"
-#include "audio/decoders/raw.h"
 #include "audio/audiostream.h"
+#include "audio/decoders/wave.h"
+#include "audio/mididrv.h"
+#include "audio/midiparser.h"
 
 namespace CGE {
 
@@ -91,6 +93,12 @@ void Sound::sndDigiStart(SmpInfo *PSmpInfo) {
 	// Start the new sound
 	_vm->_mixer->playStream(Audio::Mixer::kSFXSoundType, &_soundHandle,
 		Audio::makeLoopingAudioStream(_audioStream, (uint)PSmpInfo->_counter));
+
+	// CGE pan:
+	// 8 = Center
+	// Less = Left
+	// More = Right
+	_vm->_mixer->setChannelBalance(_soundHandle, (int8)CLIP(((PSmpInfo->_span - 8) * 16), -127, 127));
 }
 
 void Sound::stop() {
@@ -148,8 +156,11 @@ void Fx::preload(int ref0) {
 		DataCk *wav = loadWave(&file);
 		if (wav) {
 			Handler *p = &_cache[find(0)];
-			if (p >= cacheLim)
+			if (p >= cacheLim) {
+				delete wav;
 				break;
+			}
+			delete p->_wav;
 			p->_wav = wav;
 			p->_ref = ref;
 		} else {
@@ -166,6 +177,7 @@ DataCk *Fx::load(int idx, int ref) {
 	DataCk *wav = loadWave(&file);
 	if (wav) {
 		Handler *p = &_cache[idx];
+		delete p->_wav;
 		p->_wav = wav;
 		p->_ref = ref;
 	} else {
@@ -176,6 +188,10 @@ DataCk *Fx::load(int idx, int ref) {
 
 DataCk *Fx::loadWave(EncryptedStream *file) {
 	byte *data = (byte *)malloc(file->size());
+
+	if (!data)
+		return 0;
+
 	file->read(data, file->size());
 
 	return new DataCk(data, file->size());
@@ -214,6 +230,7 @@ MusicPlayer::MusicPlayer(CGEEngine *vm) : _vm(vm) {
 
 		_driver->setTimerCallback(this, &timerCallback);
 	}
+	_dataSize = -1;
 }
 
 MusicPlayer::~MusicPlayer() {

@@ -8,16 +8,15 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
- *
  *
  */
 
@@ -49,12 +48,13 @@ public:
 
 	byte *getSlotData(int slotIndex) const { return _slots[slotIndex].data; }
 
-	VarType getGameVarType(uint variable);
 	int16 getGameVar(uint variable);
 	void setGameVar(uint variable, int16 value);
 
 	void saveState(Common::WriteStream *out);
 	void loadState(Common::ReadStream *in);
+
+	void setSwitchLocalDataNear(bool newValue) { _switchLocalDataNear = newValue; }
 
 protected:
 
@@ -88,13 +88,13 @@ protected:
 	bool _cmpBitTest;
 
 	ScriptSlot _slots[kMaxScriptSlots];
-	
+
 	ScriptRegs _regs;
 	int16 _savedSp;
 
 	byte readByte();
 	int16 readInt16();
-	
+
 	void execOpcode(byte opcode);
 
 	void setupScriptFunctions();

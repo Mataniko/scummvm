@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -97,7 +97,7 @@ public:
 	 * @param stream	the actual AudioStream to be played
 	 * @param id	a unique id assigned to this stream
 	 * @param volume	the volume with which to play the sound, ranging from 0 to 255
-	 * @param balance	the balance with which to play the sound, ranging from -128 to 127
+	 * @param balance	the balance with which to play the sound, ranging from -127 to 127 (full left to full right), 0 is balanced, -128 is invalid
 	 * @param autofreeStream	a flag indicating whether the stream should be
 	 *                          freed after playback finished
 	 * @param permanent	a flag indicating whether a plain stopAll call should

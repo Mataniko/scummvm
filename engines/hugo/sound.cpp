@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -37,6 +37,7 @@
 #include "audio/decoders/raw.h"
 #include "audio/audiostream.h"
 #include "audio/midiparser.h"
+#include "audio/softsynth/pcspk.h"
 
 #include "hugo/hugo.h"
 #include "hugo/game.h"
@@ -123,11 +124,12 @@ SoundHandler::SoundHandler(HugoEngine *vm) : _vm(vm) {
 	_speakerStream = new Audio::PCSpeaker(_vm->_mixer->getOutputRate());
 	_vm->_mixer->playStream(Audio::Mixer::kSFXSoundType, &_speakerHandle,
 						_speakerStream, -1, Audio::Mixer::kMaxChannelVolume, 0, DisposeAfterUse::NO, true);
-	_DOSSongPtr = 0;
+	_DOSSongPtr = nullptr;
 	_curPriority = 0;
 	_pcspkrTimer = 0;
 	_pcspkrOctave = 3;
 	_pcspkrNoteDuration = 2;
+	_DOSIntroSong = nullptr;
 }
 
 SoundHandler::~SoundHandler() {
@@ -162,31 +164,31 @@ void SoundHandler::stopMusic() {
  * Turn music on and off
  */
 void SoundHandler::toggleMusic() {
-	_vm->_config.musicFl = !_vm->_config.musicFl;
+	_vm->_config._musicFl = !_vm->_config._musicFl;
 
-	_midiPlayer->pause(!_vm->_config.musicFl);
+	_midiPlayer->pause(!_vm->_config._musicFl);
 }
 
 /**
  * Turn digitized sound on and off
  */
 void SoundHandler::toggleSound() {
-	_vm->_config.soundFl = !_vm->_config.soundFl;
+	_vm->_config._soundFl = !_vm->_config._soundFl;
 }
 
-void SoundHandler::playMIDI(sound_pt seq_p, uint16 size) {
-	_midiPlayer->play(seq_p, size);
+void SoundHandler::playMIDI(SoundPtr seqPtr, uint16 size) {
+	_midiPlayer->play(seqPtr, size);
 }
 
 /**
  * Read a tune sequence from the sound database and start playing it
  */
 void SoundHandler::playMusic(int16 tune) {
-	sound_pt seqPtr;                                // Sequence data from file
+	SoundPtr seqPtr;                                // Sequence data from file
 	uint16 size;                                    // Size of sequence data
 
-	if (_vm->_config.musicFl) {
-		_vm->getGameStatus().song = tune;
+	if (_vm->_config._musicFl) {
+		_vm->getGameStatus()._song = tune;
 		seqPtr = _vm->_file->getSound(tune, &size);
 		playMIDI(seqPtr, size);
 		free(seqPtr);
@@ -198,22 +200,22 @@ void SoundHandler::playMusic(int16 tune) {
  * Override currently playing sound only if lower or same priority
  */
 void SoundHandler::playSound(int16 sound, const byte priority) {
-	// uint32 dwVolume;                             // Left, right volume of sound
-	sound_pt sound_p;                               // Sound data
-	uint16 size;                                    // Size of data
+	// uint32 dwVolume;                               // Left, right volume of sound
+	SoundPtr soundPtr;                                // Sound data
+	uint16 size;                                      // Size of data
 
 	// Sound disabled
-	if (!_vm->_config.soundFl || !_vm->_mixer->isReady())
+	if (!_vm->_config._soundFl || !_vm->_mixer->isReady())
 		return;
 
 	syncVolume();
 	_curPriority = priority;
 
 	// Get sound data
-	if ((sound_p = _vm->_file->getSound(sound, &size)) == 0)
+	if ((soundPtr = _vm->_file->getSound(sound, &size)) == nullptr)
 		return;
 
-	Audio::AudioStream *stream = Audio::makeRawStream(sound_p, size, 11025, Audio::FLAG_UNSIGNED);
+	Audio::AudioStream *stream = Audio::makeRawStream(soundPtr, size, 11025, Audio::FLAG_UNSIGNED);
 	_vm->_mixer->playStream(Audio::Mixer::kSFXSoundType, &_soundHandle, stream);
 }
 
@@ -245,7 +247,7 @@ void SoundHandler::checkMusic() {
 		return;
 
 	for (int i = 0; _vm->_defltTunes[i] != -1; i++) {
-		if (_vm->_defltTunes[i] == _vm->getGameStatus().song) {
+		if (_vm->_defltTunes[i] == _vm->getGameStatus()._song) {
 			if (_vm->_defltTunes[i + 1] != -1)
 				playMusic(_vm->_defltTunes[i + 1]);
 			else
@@ -270,7 +272,7 @@ void SoundHandler::pcspkr_player() {
 	static const uint16 pcspkrFlats[8] =  {1435, 1279, 2342, 2150, 1916, 1755, 1611}; // The flats, Ab to Bb
 
 	// Does the user not want any sound?
-	if (!_vm->_config.soundFl || !_vm->_mixer->isReady())
+	if (!_vm->_config._soundFl || !_vm->_mixer->isReady())
 		return;
 
 	// Is there no song?

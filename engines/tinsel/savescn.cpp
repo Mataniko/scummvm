@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -190,7 +190,7 @@ void sortActors(SAVED_DATA *sd) {
 	RestoreAuxScales(sd->SavedMoverInfo);
 	for (int i = 0; i < MAX_MOVERS; i++) {
 		if (sd->SavedMoverInfo[i].bActive)
-			Stand(nullContext, sd->SavedMoverInfo[i].actorID, sd->SavedMoverInfo[i].objX,
+			Stand(Common::nullContext, sd->SavedMoverInfo[i].actorID, sd->SavedMoverInfo[i].objX,
 				sd->SavedMoverInfo[i].objY, sd->SavedMoverInfo[i].hLastfilm);
 	}
 }
@@ -245,7 +245,7 @@ static void SortMAProcess(CORO_PARAM, const void *) {
 void ResumeInterprets() {
 	// Master script only affected on restore game, not restore scene
 	if (!TinselV2 && (g_rsd == &g_sgData)) {
-		g_scheduler->killMatchingProcess(PID_MASTER_SCR, -1);
+		CoroScheduler.killMatchingProcess(PID_MASTER_SCR, -1);
 		FreeMasterInterpretContext();
 	}
 
@@ -303,7 +303,7 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 	switch (n) {
 	case RS_COUNT + COUNTOUT_COUNT:
 		// Trigger pre-load and fade and start countdown
-		FadeOutFast(NULL);
+		FadeOutFast();
 		break;
 
 	case RS_COUNT:
@@ -314,7 +314,7 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 
 			// Master script only affected on restore game, not restore scene
 			if (sd == &g_sgData) {
-				g_scheduler->killMatchingProcess(PID_MASTER_SCR);
+				CoroScheduler.killMatchingProcess(PID_MASTER_SCR);
 				KillGlobalProcesses();
 				FreeMasterInterpretContext();
 			}
@@ -340,7 +340,7 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 
 		SetDoFadeIn(!g_bNoFade);
 		g_bNoFade = false;
-		StartupBackground(nullContext, sd->SavedBgroundHandle);
+		StartupBackground(Common::nullContext, sd->SavedBgroundHandle);
 
 		if (TinselV2) {
 			Offset(EX_USEXY, sd->SavedLoffset, sd->SavedToffset);
@@ -354,13 +354,12 @@ static int DoRestoreSceneFrame(SAVED_DATA *sd, int n) {
 
 		if (TinselV2) {
 			// create process to sort out the moving actors
-			g_scheduler->createProcess(PID_MOVER, SortMAProcess, NULL, 0);
+			CoroScheduler.createProcess(PID_MOVER, SortMAProcess, NULL, 0);
 			g_bNotDoneYet = true;
 
 			RestoreActorZ(sd->savedActorZ);
 			RestoreZpositions(sd->zPositions);
 			RestoreSysVars(sd->SavedSystemVars);
-			CreateGhostPalette(BgPal());
 			RestoreActors(sd->NumSavedActors, sd->SavedActorInfo);
 			RestoreSoundReels(sd->SavedSoundReels);
 			return 1;

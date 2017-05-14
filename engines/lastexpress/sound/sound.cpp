@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -33,7 +33,6 @@
 #include "lastexpress/sound/entry.h"
 #include "lastexpress/sound/queue.h"
 
-#include "lastexpress/helpers.h"
 #include "lastexpress/graphics.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
@@ -675,7 +674,7 @@ const char *SoundManager::getDialogName(EntityIndex entity) const {
 //////////////////////////////////////////////////////////////////////////
 // Letters & Messages
 //////////////////////////////////////////////////////////////////////////
-void SoundManager::readText(int id){
+void SoundManager::readText(int id) {
 	if (!_queue->isBuffered(kEntityTables4))
 		return;
 
@@ -985,22 +984,22 @@ void SoundManager::excuseMe(EntityIndex entity, EntityIndex entity2, SoundFlag f
 		playSound(kEntityPlayer, (rnd(2) ? "HDE1002" : "HED1002A"), flag);
 		break;
 
-	case kEntityServers0:
-	case kEntityServers1:
+	case kEntityWaiter1:
+	case kEntityWaiter2:
 		switch(rnd(3)) {
 		default:
 			break;
 
 		case 0:
-			playSound(kEntityPlayer, (entity == kEntityServers0) ? "WAT1002" : "WAT1003", flag);
+			playSound(kEntityPlayer, (entity == kEntityWaiter1) ? "WAT1002" : "WAT1003", flag);
 			break;
 
 		case 1:
-			playSound(kEntityPlayer, (entity == kEntityServers0) ? "WAT1002A" : "WAT1003A", flag);
+			playSound(kEntityPlayer, (entity == kEntityWaiter1) ? "WAT1002A" : "WAT1003A", flag);
 			break;
 
 		case 2:
-			playSound(kEntityPlayer, (entity == kEntityServers0) ? "WAT1002B" : "WAT1003B", flag);
+			playSound(kEntityPlayer, (entity == kEntityWaiter1) ? "WAT1002B" : "WAT1003B", flag);
 			break;
 		}
 		break;
@@ -1324,29 +1323,29 @@ void SoundManager::playLoopingSound(int param) {
 							break;
 						if (getEntities()->isInsideCompartment(kEntityPlayer, getEntityData(kEntityPlayer)->car, positions[pos])) {
 							numLoops[0] = 1;
-							partNumber = (getObjects()->get((ObjectIndex)objNum).location - 2) < 1 ? 6 : 1;
+							partNumber = (getObjects()->get((ObjectIndex)objNum).status - 2) < 1 ? 6 : 1;
 						}
 						objNum++;
 					}
 				} else {
 					switch (getEntityData(kEntityPlayer)->car) {
-					case 1:
-					case 6:
+					case kCarBaggageRear:
+					case kCarBaggage:
 						partNumber = 4;
 						break;
-					case 2:
-					case 3:
-					case 4:
-					case 5:
+					case kCarKronos:
+					case kCarGreenSleeping:
+					case kCarRedSleeping:
+					case kCarRestaurant:
 						partNumber = 1;
 						break;
-					case 7:
+					case kCarCoalTender:
 						partNumber = 5;
 						break;
-					case 8:
+					case kCarLocomotive:
 						partNumber = 99;
 						break;
-					case 9:
+					case kCar9:
 						partNumber = 3;
 						break;
 					default:
@@ -1357,13 +1356,13 @@ void SoundManager::playLoopingSound(int param) {
 			}
 
 			if (partNumber != 99)
-				sprintf(tmp, "LOOP%d%c.SND", partNumber, _engine->getRandom().getRandomNumber(numLoops[partNumber] - 1) + 'A');
+				sprintf(tmp, "LOOP%d%c.SND", partNumber, (char)(_engine->getRandom().getRandomNumber(numLoops[partNumber] - 1) + 'A'));
 		}
 
 		if (getFlags()->flag_3)
 			fnameLen = 5;
 
-		if (!entry || scumm_strnicmp(entry->getName2().c_str(), tmp, fnameLen)) {
+		if (!entry || scumm_strnicmp(entry->getName2().c_str(), tmp, (uint)fnameLen)) {
 			_loopingSoundDuration = _engine->getRandom().getRandomNumber(319) + 260;
 
 			if (partNumber != 99) {

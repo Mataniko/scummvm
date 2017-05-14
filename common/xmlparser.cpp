@@ -20,15 +20,11 @@
  *
  */
 
-// FIXME: Avoid using fprintf
-#define FORBIDDEN_SYMBOL_EXCEPTION_fprintf
-#define FORBIDDEN_SYMBOL_EXCEPTION_stderr
-
-
 #include "common/xmlparser.h"
 #include "common/archive.h"
 #include "common/fs.h"
 #include "common/memstream.h"
+#include "common/system.h"
 
 namespace Common {
 
@@ -73,7 +69,7 @@ bool XMLParser::loadBuffer(const byte *buffer, uint32 size, DisposeAfterUse::Fla
 bool XMLParser::loadStream(SeekableReadStream *stream) {
 	_stream = stream;
 	_fileName = "File Stream";
-	return true;
+	return _stream != nullptr;
 }
 
 void XMLParser::close() {
@@ -101,39 +97,43 @@ bool XMLParser::parserError(const String &errStr) {
 	assert(_stream->pos() == startPosition);
 	currentPosition = startPosition;
 
-	int keyOpening = 0;
-	int keyClosing = 0;
+	Common::String errorMessage = Common::String::format("\n  File <%s>, line %d:\n", _fileName.c_str(), lineCount);
 
-	while (currentPosition-- && keyOpening == 0) {
-		_stream->seek(-2, SEEK_CUR);
-		c = _stream->readByte();
+	if (startPosition > 1) {
+		int keyOpening = 0;
+		int keyClosing = 0;
 
-		if (c == '<')
-			keyOpening = currentPosition - 1;
-		else if (c == '>')
-			keyClosing = currentPosition;
+		while (currentPosition-- && keyOpening == 0) {
+			_stream->seek(-2, SEEK_CUR);
+			c = _stream->readByte();
+
+			if (c == '<')
+				keyOpening = currentPosition - 1;
+			else if (c == '>')
+				keyClosing = currentPosition;
+		}
+
+		_stream->seek(startPosition, SEEK_SET);
+		currentPosition = startPosition;
+		while (keyClosing == 0 && c && currentPosition++) {
+			c = _stream->readByte();
+
+			if (c == '>')
+				keyClosing = currentPosition;
+		}
+
+		currentPosition = (keyClosing - keyOpening);
+		_stream->seek(keyOpening, SEEK_SET);
+
+		while (currentPosition--)
+			errorMessage += (char)_stream->readByte();
 	}
 
-	_stream->seek(startPosition, SEEK_SET);
-	currentPosition = startPosition;
-	while (keyClosing == 0 && c && currentPosition++) {
-		c = _stream->readByte();
+	errorMessage += "\n\nParser error: ";
+	errorMessage += errStr;
+	errorMessage += "\n\n";
 
-		if (c == '>')
-			keyClosing = currentPosition;
-	}
-
-	fprintf(stderr, "\n  File <%s>, line %d:\n", _fileName.c_str(), lineCount);
-
-	currentPosition = (keyClosing - keyOpening);
-	_stream->seek(keyOpening, SEEK_SET);
-
-	while (currentPosition--)
-		fprintf(stderr, "%c", _stream->readByte());
-
-	fprintf(stderr, "\n\nParser error: ");
-	fprintf(stderr, "%s", errStr.c_str());
-	fprintf(stderr, "\n\n");
+	g_system->logMessage(LogMessageType::kError, errorMessage.c_str());
 
 	return false;
 }
@@ -300,7 +300,7 @@ bool XMLParser::closeKey() {
 
 bool XMLParser::parse() {
 	if (_stream == 0)
-		return parserError("XML stream not ready for reading.");
+		return false;
 
 	// Make sure we are at the start of the stream.
 	_stream->seek(0, SEEK_SET);

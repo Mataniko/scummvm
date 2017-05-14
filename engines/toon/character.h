@@ -1,27 +1,30 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ */
 
 #ifndef TOON_CHARACTER_H
 #define TOON_CHARACTER_H
+
+#include "common/array.h"
+#include "common/rect.h"
 
 #include "toon/toon.h"
 
@@ -65,13 +68,13 @@ public:
 	virtual int32 getFlag();
 	virtual int32 getAnimFlag();
 	virtual void setAnimFlag(int32 flag);
-	virtual void setPosition(int32 x, int32 y);
-	virtual void forcePosition(int32 x, int32 y);
-	virtual int32 getX();
-	virtual int32 getY();
-	virtual int32 getFinalX();
-	virtual int32 getFinalY();
-	virtual bool walkTo(int32 newPosX, int32 newPosY);
+	virtual void setPosition(int16 x, int16 y);
+	virtual void forcePosition(int16 x, int16 y);
+	virtual int16 getX();
+	virtual int16 getY();
+	virtual int16 getFinalX();
+	virtual int16 getFinalY();
+	virtual bool walkTo(int16 newPosX, int16 newPosY);
 	virtual bool getVisible();
 	virtual void setVisible(bool visible);
 	virtual bool loadWalkAnimation(const Common::String &animName);
@@ -99,7 +102,7 @@ public:
 	virtual void resetScale() {}
 	virtual void plotPath(Graphics::Surface& surface);
 
-	int32 getFacingFromDirection(int32 dx, int32 dy);
+	int32 getFacingFromDirection(int16 dx, int16 dy);
 	static const SpecialCharacterAnimation *getSpecialAnimation(int32 characterId, int32 animationId);
 
 protected:
@@ -112,11 +115,11 @@ protected:
 	int32 _sceneAnimationId;
 	int32 _lineToSayId;
 	int32 _time;
-	int32 _x;
-	int32 _y;
+	int16 _x;
+	int16 _y;
 	int32 _z;
-	int32 _finalX;
-	int32 _finalY;
+	int16 _finalX;
+	int16 _finalY;
 	int32 _facing;
 	int32 _flags;
 	int32 _animFlags;
@@ -137,11 +140,10 @@ protected:
 	Animation *_shadowAnim;
 	Animation *_specialAnim;
 
-	int32 _currentPathX[4096];
-	int32 _currentPathY[4096];
-	int32 _currentPathNodeCount;
-	int32 _currentPathNode;
+	Common::Array<Common::Point> _currentPath;
+	uint32 _currentPathNode;
 	int32 _currentWalkStamp;
+	int32 _currentFacingStamp;
 };
 
 } // End of namespace Toon

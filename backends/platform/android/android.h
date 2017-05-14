@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -96,13 +96,6 @@ extern void checkGlError(const char *expr, const char *file, int line);
 #define GLTHREADCHECK do {  } while (false)
 #endif
 
-#ifdef DYNAMIC_MODULES
-class AndroidPluginProvider : public POSIXPluginProvider {
-protected:
-	virtual void addCustomDirectories(Common::FSList &dirs) const;
-};
-#endif
-
 class OSystem_Android : public EventsBaseBackend, public PaletteManager {
 private:
 	// passed from the dark side
@@ -177,7 +170,6 @@ public:
 	virtual ~OSystem_Android();
 
 	virtual void initBackend();
-	void addPluginDirectories(Common::FSList &dirs) const;
 	void enableZoning(bool enable) { _enable_zoning = enable; }
 
 	virtual bool hasFeature(Feature f);
@@ -231,10 +223,11 @@ private:
 	int _touchpad_scale;
 	int _trackball_scale;
 	int _dpad_scale;
+	int _joystick_scale;
 	int _fingersDown;
 
 	void clipMouse(Common::Point &p);
-	void scaleMouse(Common::Point &p, int x, int y, bool deductDrawRect = true);
+	void scaleMouse(Common::Point &p, int x, int y, bool deductDrawRect = true, bool touchpadMode = false);
 	void updateEventScale();
 	void disableCursorPalette();
 
@@ -244,7 +237,7 @@ protected:
 	virtual void grabPalette(byte *colors, uint start, uint num);
 
 public:
-	virtual void copyRectToScreen(const byte *buf, int pitch, int x, int y,
+	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y,
 									int w, int h);
 	virtual void updateScreen();
 	virtual Graphics::Surface *lockScreen();
@@ -257,8 +250,8 @@ public:
 	virtual void showOverlay();
 	virtual void hideOverlay();
 	virtual void clearOverlay();
-	virtual void grabOverlay(OverlayColor *buf, int pitch);
-	virtual void copyRectToOverlay(const OverlayColor *buf, int pitch,
+	virtual void grabOverlay(void *buf, int pitch);
+	virtual void copyRectToOverlay(const void *buf, int pitch,
 									int x, int y, int w, int h);
 	virtual int16 getOverlayHeight();
 	virtual int16 getOverlayWidth();
@@ -267,14 +260,14 @@ public:
 	virtual bool showMouse(bool visible);
 
 	virtual void warpMouse(int x, int y);
-	virtual void setMouseCursor(const byte *buf, uint w, uint h, int hotspotX,
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 								int hotspotY, uint32 keycolor,
-								int cursorTargetScale,
+								bool dontScale,
 								const Graphics::PixelFormat *format);
 	virtual void setCursorPalette(const byte *colors, uint start, uint num);
 
 	virtual bool pollEvent(Common::Event &event);
-	virtual uint32 getMillis();
+	virtual uint32 getMillis(bool skipRecord = false);
 	virtual void delayMillis(uint msecs);
 
 	virtual MutexRef createMutex(void);
@@ -293,6 +286,7 @@ public:
 	virtual void logMessage(LogMessageType::Type type, const char *message);
 	virtual void addSysArchivesToSearchSet(Common::SearchSet &s,
 											int priority = 0);
+	virtual bool openUrl(const Common::String &url);
 	virtual Common::String getSystemLanguage() const;
 };
 

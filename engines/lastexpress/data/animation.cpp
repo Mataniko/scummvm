@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,16 +32,14 @@
 
 #include "common/events.h"
 #include "common/rational.h"
-#include "common/rect.h"
 #include "common/stream.h"
 #include "common/system.h"
-#include "common/textconsole.h"
 
 #include "engines/engine.h"
 
 namespace LastExpress {
 
-Animation::Animation() : _stream(NULL), _currentChunk(NULL), _overlay(NULL), _background1(NULL), _background2(NULL), _backgroundCurrent(0), _audio(NULL), _startTime(0), _changed(false), _flag(0) {
+Animation::Animation() : _stream(NULL), _currentChunk(NULL), _overlay(NULL), _background1(NULL), _background2(NULL), _backgroundCurrent(0), _audio(NULL), _startTime(0), _changed(false) {
 }
 
 Animation::~Animation() {
@@ -232,7 +230,7 @@ AnimFrame *Animation::processChunkFrame(Common::SeekableReadStream *in, const Ch
 	i.read(str, false);
 
 	// Decode the frame
-	AnimFrame *f = new AnimFrame(str, i);
+	AnimFrame *f = new AnimFrame(str, i, true);
 
 	// Delete the temporary chunk buffer
 	delete str;
@@ -250,7 +248,7 @@ void Animation::processChunkAudio(Common::SeekableReadStream *in, const Chunk &c
 		// Read Snd header
 		uint32 header1 = in->readUint32LE();
 		uint16 header2 = in->readUint16LE();
-		warning("Start ADPCM: %d, %d", header1, header2);
+		debugC(4, kLastExpressDebugSound, "Start ADPCM: %d, %d", header1, header2);
 		size -= 6;
 	}
 
@@ -272,7 +270,7 @@ void Animation::play() {
 			draw(s);
 
 			// XXX: Update the screen
-			g_system->copyRectToScreen((byte *)s->pixels, s->pitch, 0, 0, s->w, s->h);
+			g_system->copyRectToScreen(s->getPixels(), s->pitch, 0, 0, s->w, s->h);
 
 			// Free the temporary surface
 			s->free();

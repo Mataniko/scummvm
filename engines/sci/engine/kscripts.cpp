@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -93,7 +93,7 @@ reg_t kLock(EngineState *s, int argc, reg_t *argv) {
 					// Happens in CD games (e.g. LSL6CD) with the message
 					// resource. It isn't fatal, and it's usually caused
 					// by leftover scripts.
-					debugC(kDebugLevelResMan, "[resMan] Attempt to unlock non-existant resource %s", id.toString().c_str());
+					debugC(kDebugLevelResMan, "[resMan] Attempt to unlock non-existent resource %s", id.toString().c_str());
 			}
 		}
 		break;
@@ -102,14 +102,8 @@ reg_t kLock(EngineState *s, int argc, reg_t *argv) {
 }
 
 reg_t kResCheck(EngineState *s, int argc, reg_t *argv) {
-	Resource *res = NULL;
+	Resource *res = nullptr;
 	ResourceType restype = g_sci->getResMan()->convertResType(argv[0].toUint16());
-
-	if (restype == kResourceTypeVMD) {
-		char fileName[10];
-		sprintf(fileName, "%d.vmd", argv[1].toUint16());
-		return make_reg(0, Common::File::exists(fileName));
-	}
 
 	if ((restype == kResourceTypeAudio36) || (restype == kResourceTypeSync36)) {
 		if (argc >= 6) {
@@ -124,7 +118,33 @@ reg_t kResCheck(EngineState *s, int argc, reg_t *argv) {
 		res = g_sci->getResMan()->testResource(ResourceId(restype, argv[1].toUint16()));
 	}
 
-	return make_reg(0, res != NULL);
+#ifdef ENABLE_SCI32
+	// GK2 stores some VMDs inside of resource volumes, but usually videos are
+	// streamed from the filesystem.
+	if (res == nullptr) {
+		const char *format = nullptr;
+		switch (restype) {
+		case kResourceTypeRobot:
+			format = "%u.rbt";
+			break;
+		case kResourceTypeDuck:
+			format = "%u.duk";
+			break;
+		case kResourceTypeVMD:
+			format = "%u.vmd";
+			break;
+		default:
+			format = nullptr;
+		}
+
+		if (format) {
+			const Common::String fileName = Common::String::format(format, argv[1].toUint16());
+			return make_reg(0, Common::File::exists(fileName));
+		}
+	}
+#endif
+
+	return make_reg(0, res != nullptr);
 }
 
 reg_t kClone(EngineState *s, int argc, reg_t *argv) {
@@ -140,7 +160,7 @@ reg_t kClone(EngineState *s, int argc, reg_t *argv) {
 
 	debugC(kDebugLevelMemory, "Attempting to clone from %04x:%04x", PRINT_REG(parentAddr));
 
-	uint16 infoSelector = parentObj->getInfoSelector().offset;
+	uint16 infoSelector = parentObj->getInfoSelector().getOffset();
 	cloneObj = s->_segMan->allocateClone(&cloneAddr);
 
 	if (!cloneObj) {
@@ -169,8 +189,8 @@ reg_t kClone(EngineState *s, int argc, reg_t *argv) {
 	cloneObj->setSpeciesSelector(cloneObj->getPos());
 	if (parentObj->isClass())
 		cloneObj->setSuperClassSelector(parentObj->getPos());
-	s->_segMan->getScript(parentObj->getPos().segment)->incrementLockers();
-	s->_segMan->getScript(cloneObj->getPos().segment)->incrementLockers();
+	s->_segMan->getScript(parentObj->getPos().getSegment())->incrementLockers();
+	s->_segMan->getScript(cloneObj->getPos().getSegment())->incrementLockers();
 
 	return cloneAddr;
 }
@@ -191,7 +211,7 @@ reg_t kDisposeClone(EngineState *s, int argc, reg_t *argv) {
 	//  At least kq4early relies on this behavior. The scripts clone "Sound", then set bit 1 manually
 	//  and call kDisposeClone later. In that case we may not free it, otherwise we will run into issues
 	//  later, because kIsObject would then return false and Sound object wouldn't get checked.
-	uint16 infoSelector = object->getInfoSelector().offset;
+	uint16 infoSelector = object->getInfoSelector().getOffset();
 	if ((infoSelector & 3) == kInfoFlagClone)
 		object->markAsFreed();
 
@@ -203,7 +223,7 @@ reg_t kScriptID(EngineState *s, int argc, reg_t *argv) {
 	int script = argv[0].toUint16();
 	uint16 index = (argc > 1) ? argv[1].toUint16() : 0;
 
-	if (argv[0].segment)
+	if (argv[0].getSegment())
 		return argv[0];
 
 	SegmentId scriptSeg = s->_segMan->getScriptSegment(script, SCRIPT_GET_LOAD);
@@ -226,15 +246,10 @@ reg_t kScriptID(EngineState *s, int argc, reg_t *argv) {
 		return NULL_REG;
 	}
 
-	if (index > scr->getExportsNr()) {
-		error("Dispatch index too big: %d > %d", index, scr->getExportsNr());
-		return NULL_REG;
-	}
-
-	uint16 address = scr->validateExportFunc(index, true);
+	uint32 address = scr->validateExportFunc(index, true);
 
 	// Point to the heap for SCI1.1 - SCI2.1 games
-	if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1)
+	if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1_LATE)
 		address += scr->getScriptSize();
 
 	// Bugfix for the intro speed in PQ2 version 1.002.011.
@@ -243,20 +258,23 @@ reg_t kScriptID(EngineState *s, int argc, reg_t *argv) {
 	// initialized to 0, whereas it's 6 in other versions. Thus, we assign it
 	// to 6 here, fixing the speed of the introduction. Refer to bug #3102071.
 	if (g_sci->getGameId() == GID_PQ2 && script == 200 &&
-		s->variables[VAR_GLOBAL][3].isNull()) {
-		s->variables[VAR_GLOBAL][3] = make_reg(0, 6);
+		s->variables[VAR_GLOBAL][kGlobalVarSpeed].isNull()) {
+		s->variables[VAR_GLOBAL][kGlobalVarSpeed] = make_reg(0, 6);
 	}
 
-	return make_reg(scriptSeg, address);
+	reg_t addr;
+	addr.setSegment(scriptSeg);
+	addr.setOffset(address);
+	return addr;
 }
 
 reg_t kDisposeScript(EngineState *s, int argc, reg_t *argv) {
-	int script = argv[0].offset;
+	int script = argv[0].getOffset();
 
 	SegmentId id = s->_segMan->getScriptSegment(script);
 	Script *scr = s->_segMan->getScriptIfLoaded(id);
 	if (scr && !scr->isMarkedAsDeleted()) {
-		if (s->_executionStack.back().addr.pc.segment != id)
+		if (s->_executionStack.back().addr.pc.getSegment() != id)
 			scr->setLockers(1);
 	}
 
@@ -265,15 +283,12 @@ reg_t kDisposeScript(EngineState *s, int argc, reg_t *argv) {
 	if (argc != 2) {
 		return s->r_acc;
 	} else {
-		// This exists in the KQ5CD and GK1 interpreter. We know it is used
-		// when GK1 starts up, before the Sierra logo.
-		warning("kDisposeScript called with 2 parameters, still untested");
 		return argv[1];
 	}
 }
 
 reg_t kIsObject(EngineState *s, int argc, reg_t *argv) {
-	if (argv[0].offset == SIGNAL_OFFSET) // Treated specially
+	if (argv[0].getOffset() == SIGNAL_OFFSET) // Treated specially
 		return NULL_REG;
 	else
 		return make_reg(0, s->_segMan->isHeapObject(argv[0]));

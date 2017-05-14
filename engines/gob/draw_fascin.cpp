@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -222,8 +222,8 @@ void Draw_Fascination::spriteOperation(int16 operation) {
 								_destSpriteX, _destSpriteY, _frontColor, _backColor, _transparency);
 					}
 				} else {
-					drawString(_textToPrint, _destSpriteX, _destSpriteY, _frontColor,
-							_backColor, _transparency, *_spritesArray[_destSurface], *font);
+					font->drawString(_textToPrint, _destSpriteX, _destSpriteY, _frontColor,
+							_backColor, _transparency, *_spritesArray[_destSurface]);
 					_destSpriteX += len * font->getCharWidth();
 				}
 			} else {
@@ -747,7 +747,7 @@ int16 Draw_Fascination::openWin(int16 id) {
 int16 Draw_Fascination::getWinFromCoord(int16 &dx, int16 &dy) {
 	int16 bestMatch = -1;
 
-	if ((_renderFlags & 128) == 0)
+	if (!(_renderFlags & RENDERFLAG_HASWINDOWS))
 		return -1;
 
 	for (int i = 0; i < 10; i++) {
@@ -790,7 +790,7 @@ int16 Draw_Fascination::handleCurWin() {
 	int8 matchNum = 0;
 	int16 bestMatch = -1;
 
-	if ((_vm->_game->_mouseButtons != 1) || ((_renderFlags & 128) == 0))
+	if ((_vm->_game->_mouseButtons != 1) || !(_renderFlags & RENDERFLAG_HASWINDOWS))
 		return 0;
 
 	for (int i = 0; i < 10; i++) {
@@ -882,8 +882,6 @@ bool Draw_Fascination::overlapWin(int16 idWin1, int16 idWin2) {
 void Draw_Fascination::activeWin(int16 id) {
 	bool found = false;
 	int16 t[10], t2[10];
-	int nextId = -1;
-	int oldId  = -1;
 	SurfacePtr tempSrf;
 	SurfacePtr oldSrf[10];
 
@@ -906,6 +904,8 @@ void Draw_Fascination::activeWin(int16 id) {
 	}
 
 	if (found) {
+		int nextId = -1;
+		int oldId  = -1;
 		for (int i = 9; i >= 0; i--) {
 			if (t[i] != -1) {
 				if (nextId != -1)

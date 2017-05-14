@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -27,7 +27,8 @@
 #include "audio/audiostream.h"
 #include "audio/mididrv.h"
 #include "audio/midiparser.h"
-#include "audio/decoders/adpcm.h"
+// Miles Audio for Discworld 1
+#include "audio/miles.h"
 
 #include "backends/audiocd/audiocd.h"
 
@@ -91,28 +92,29 @@ static const int enhancedAudioGRAVersion[] = {
 };
 
 static const int enhancedAudioSCNVersion[] = {
-	 301, 302,   2,    1,   1, 301, 302,   3,   3,   4,	//   1-10
-	   4,   5,   6,    1,   7,   8,   9,  10,   8,  11,	//  11-20
-	  11,  12,  13,   13,  13,  13,  13,  14,  13,  13,	//  21-30
-	  15,  16,  17,   15,  18,  19,  20, 338,  21,  21,	//  31-40
-	 341, 342,  22,   22,  23,  24,  25,  26,  27,  28,	//  41-50
-	  29,  30,  31,   32,  33,  34,  35,  35,  36,  37,	//  51-60
-	  38,  39,  39,   39,  39,  40,  39,  41,  41,  42,	//  61-70
-	  43,  42,  44,   45,  41,  46,  48,  47,  48,  49,	//  71-80
-	  50,  51,  52,   53,  54,  55,  56,  57,  58,  59,	//  81-90
-	  60,  61,  62,   63,  61,  64,  65,  66,  67,  68,	//  91-100
-	  69,  70,  68,   71,  72,  73,  74,  75,  12,  76,	// 101-110
-	  77,  78,  79,   80,   4,   4,  82,  83,  77,   4,	// 111-120
-	  84,  85,  86, 3124,  88,  89,  90,  88,   2,   2,	// 121-130
-	   2,   2,   2,    2,   2,   2,   2,   2,   2,   2,	// 131-140
-	3142,  91,  92,   93,  94,  94,  95,  96,  52,   4,	// 141-150
-	  97,  98,  99,   99                             	// 151-154
+	 301, 302,   2,    1,   1, 301, 302,   3,   3,   4, //   1-10
+	   4,   5,   6,    1,   7,   8,   9,  10,   8,  11, //  11-20
+	  11,  12,  13,   13,  13,  13,  13,  14,  13,  13, //  21-30
+	  15,  16,  17,   15,  18,  19,  20, 338,  21,  21, //  31-40
+	 341, 342,  22,   22,  23,  24,  25,  26,  27,  28, //  41-50
+	  29,  30,  31,   32,  33,  34,  35,  35,  36,  37, //  51-60
+	  38,  39,  39,   39,  39,  40,  39,  41,  41,  42, //  61-70
+	  43,  42,  44,   45,  41,  46,  48,  47,  48,  49, //  71-80
+	  50,  51,  52,   53,  54,  55,  56,  57,  58,  59, //  81-90
+	  60,  61,  62,   63,  61,  64,  65,  66,  67,  68, //  91-100
+	  69,  70,  68,   71,  72,  73,  74,  75,  12,  76, // 101-110
+	  77,  78,  79,   80,   4,   4,  82,  83,  77,   4, // 111-120
+	  84,  85,  86, 3124,  88,  89,  90,  88,   2,   2, // 121-130
+	   2,   2,   2,    2,   2,   2,   2,   2,   2,   2, // 131-140
+	3142,  91,  92,   93,  94,  94,  95,  96,  52,   4, // 141-150
+	  97,  98,  99,   99                                // 151-154
 };
 
 int GetTrackNumber(SCNHANDLE hMidi) {
-	for (int i = 0; i < ARRAYSIZE(g_midiOffsets); i++)
+	for (int i = 0; i < ARRAYSIZE(g_midiOffsets); i++) {
 		if (g_midiOffsets[i] == hMidi)
 			return i;
+	}
 
 	return -1;
 }
@@ -131,21 +133,13 @@ bool PlayMidiSequence(uint32 dwFileOffset, bool bLoop) {
 	g_currentMidi = dwFileOffset;
 	g_currentLoop = bLoop;
 
-	// Tinsel V1 PSX uses a different music format, so i
-	// disable it here.
-	// TODO: Maybe this should be moved to a better place...
-	if (TinselV1PSX) return false;
+	bool mute = false;
+	if (ConfMan.hasKey("mute"))
+		mute = ConfMan.getBool("mute");
 
-	if (_vm->_config->_musicVolume != 0) {
-		bool mute = false;
-		if (ConfMan.hasKey("mute"))
-			mute = ConfMan.getBool("mute");
-
-		SetMidiVolume(mute ? 0 : _vm->_config->_musicVolume);
-	}
+	SetMidiVolume(mute ? 0 : _vm->_config->_musicVolume);
 
 	// the index and length of the last tune loaded
-	static uint32 dwLastMidiIndex = 0;	// FIXME: Avoid non-const global vars
 	uint32 dwSeqLen = 0;	// length of the sequence
 
 	// Support for external music from the music enhancement project
@@ -186,20 +180,20 @@ bool PlayMidiSequence(uint32 dwFileOffset, bool bLoop) {
 	if (dwFileOffset == 0)
 		return true;
 
-	if (dwFileOffset != dwLastMidiIndex) {
-		Common::File midiStream;
+	Common::File midiStream;
 
-		// open MIDI sequence file in binary mode
-		if (!midiStream.open(MIDI_FILE))
-			error(CANNOT_FIND_FILE, MIDI_FILE);
+	// open MIDI sequence file in binary mode
+	if (!midiStream.open(MIDI_FILE))
+		error(CANNOT_FIND_FILE, MIDI_FILE);
 
-		// update index of last tune loaded
-		dwLastMidiIndex = dwFileOffset;
+	// move to correct position in the file
+	midiStream.seek(dwFileOffset, SEEK_SET);
 
-		// move to correct position in the file
-		midiStream.seek(dwFileOffset, SEEK_SET);
-
-		// read the length of the sequence
+	if (TinselV1Mac) {
+		// The Macintosh version of DW1 uses raw PCM for music
+		dwSeqLen = midiStream.readUint32BE();
+		_vm->_sound->playDW1MacMusic(midiStream, dwSeqLen);
+	} else {
 		dwSeqLen = midiStream.readUint32LE();
 
 		// make sure buffer is large enough for this sequence
@@ -208,11 +202,13 @@ bool PlayMidiSequence(uint32 dwFileOffset, bool bLoop) {
 		// stop any currently playing tune
 		_vm->_midiMusic->stop();
 
-		// read the sequence
+		// read the sequence. This needs to be read again before playSEQ() is
+		// called even if the music is restarting, as playSEQ() reads the file
+		// name off the buffer itself. However, that function adds SMF headers
+		// to the buffer, thus if it's read again, the SMF headers will be read
+		// and the filename will always be 'MThd'.
 		if (midiStream.read(g_midiBuffer.pDat, dwSeqLen) != dwSeqLen)
 			error(FILE_IS_CORRUPT, MIDI_FILE);
-
-		midiStream.close();
 
 		// WORKAROUND for bug #2820054 "DW1: No intro music at first start on Wii",
 		// which actually affects all ports, since it's specific to the GRA version.
@@ -231,15 +227,10 @@ bool PlayMidiSequence(uint32 dwFileOffset, bool bLoop) {
 			_vm->_midiMusic->send(0x7F07B0 | 13);
 		}
 
-		_vm->_midiMusic->playXMIDI(g_midiBuffer.pDat, dwSeqLen, bLoop);
-
-		// Store the length
-		//dwLastSeqLen = dwSeqLen;
-	} else {
-	 	// dwFileOffset == dwLastMidiIndex
-		_vm->_midiMusic->stop();
-		_vm->_midiMusic->playXMIDI(g_midiBuffer.pDat, dwSeqLen, bLoop);
+		_vm->_midiMusic->playMIDI(dwSeqLen, bLoop);
 	}
+
+	midiStream.close();
 
 	return true;
 }
@@ -284,27 +275,7 @@ int GetMidiVolume() {
  */
 void SetMidiVolume(int vol) {
 	assert(vol >= 0 && vol <= Audio::Mixer::kMaxChannelVolume);
-
-	static int priorVolMusic = 0;	// FIXME: Avoid non-const global vars
-
-	if (vol == 0 && priorVolMusic == 0)	{
-		// Nothing to do
-	} else if (vol == 0 && priorVolMusic != 0) {
-		// Stop current midi sequence
-		StopMidi();
-		_vm->_midiMusic->setVolume(vol);
-	} else if (vol != 0 && priorVolMusic == 0) {
-		// Perhaps restart last midi sequence
-		if (g_currentLoop)
-			PlayMidiSequence(g_currentMidi, true);
-
-		_vm->_midiMusic->setVolume(vol);
-	} else if (vol != 0 && priorVolMusic != 0) {
-		// Alter current volume
-		_vm->_midiMusic->setVolume(vol);
-	}
-
-	priorVolMusic = vol;
+	_vm->_midiMusic->setVolume(vol);
 }
 
 /**
@@ -313,64 +284,89 @@ void SetMidiVolume(int vol) {
 void OpenMidiFiles() {
 	Common::File midiStream;
 
-	// Demo version has no midi file
-	// Also, Discworld PSX uses still unsupported psx SEQ format for music...
-	if ((_vm->getFeatures() & GF_DEMO) || (TinselVersion == TINSEL_V2) || TinselV1PSX)
-		return;
+	if (TinselV0) {
+		// The early demo version of DW1 doesn't have MIDI
+	} else if (TinselV2) {
+		// DW2 uses a different music mechanism
+	} else if (TinselV1Mac) {
+		// open MIDI sequence file in binary mode
+		if (!midiStream.open(MIDI_FILE))
+			error(CANNOT_FIND_FILE, MIDI_FILE);
 
-	if (g_midiBuffer.pDat)
-		// already allocated
-		return;
+		uint32 curTrack = 1;
+		uint32 songLength = 0;
+		int32 fileSize = midiStream.size();
 
-	// open MIDI sequence file in binary mode
-	if (!midiStream.open(MIDI_FILE))
-		error(CANNOT_FIND_FILE, MIDI_FILE);
+		// Init
+		for (int i = 0; i < ARRAYSIZE(g_midiOffsets); i++)
+			g_midiOffsets[i] = 0;
 
-	// gen length of the largest sequence
-	g_midiBuffer.size = midiStream.readUint32LE();
-	if (midiStream.eos() || midiStream.err())
-		error(FILE_IS_CORRUPT, MIDI_FILE);
+		midiStream.skip(4);	// skip file header
 
-	if (g_midiBuffer.size) {
-		// allocate a buffer big enough for the largest MIDI sequence
-		if ((g_midiBuffer.pDat = (uint8 *)malloc(g_midiBuffer.size)) != NULL) {
-			// clear out the buffer
-			memset(g_midiBuffer.pDat, 0, g_midiBuffer.size);
-//			VMM_lock(midiBuffer.pDat, midiBuffer.size);
-		} else {
-			//mSeqHandle = NULL;
+		while (!midiStream.eos() && !midiStream.err() && midiStream.pos() != fileSize) {
+			assert(curTrack < ARRAYSIZE(g_midiOffsets));
+			g_midiOffsets[curTrack] = midiStream.pos();
+			//debug("%d: %d", curTrack, g_midiOffsets[curTrack]);
+
+			songLength = midiStream.readUint32BE();
+			midiStream.skip(songLength);
+
+			curTrack++;
 		}
+
+		midiStream.close();
+	} else {
+		if (g_midiBuffer.pDat)
+			// already allocated
+			return;
+
+		// open MIDI sequence file in binary mode
+		if (!midiStream.open(MIDI_FILE))
+			error(CANNOT_FIND_FILE, MIDI_FILE);
+
+		// get length of the largest sequence
+		g_midiBuffer.size = midiStream.readUint32LE();
+		if (midiStream.eos() || midiStream.err())
+			error(FILE_IS_CORRUPT, MIDI_FILE);
+
+		if (g_midiBuffer.size) {
+			// allocate a buffer big enough for the largest MIDI sequence
+			if ((g_midiBuffer.pDat = (uint8 *)malloc(g_midiBuffer.size)) != NULL) {
+				// clear out the buffer
+				memset(g_midiBuffer.pDat, 0, g_midiBuffer.size);
+			}
+		}
+
+		// Now scan through the contents of the MIDI file to find the offset
+		// of each individual track, in order to create a mapping from MIDI
+		// offset to track number, for the enhanced MIDI soundtrack.
+		// The first song is always at position 4. The subsequent ones are
+		// calculated dynamically.
+		uint32 curOffset = 4;
+		uint32 curTrack = 0;
+		uint32 songLength = 0;
+
+		// Init
+		for (int i = 0; i < ARRAYSIZE(g_midiOffsets); i++)
+			g_midiOffsets[i] = 0;
+
+		while (!midiStream.eos() && !midiStream.err()) {
+			if (curOffset + (4 * curTrack) >= (uint32)midiStream.size())
+				break;
+
+			assert(curTrack < ARRAYSIZE(g_midiOffsets));
+			g_midiOffsets[curTrack] = curOffset + (4 * curTrack);
+			//debug("%d: %d", curTrack, midiOffsets[curTrack]);
+
+			songLength = midiStream.readUint32LE();
+			curOffset += songLength;
+			midiStream.skip(songLength);
+
+			curTrack++;
+		}
+
+		midiStream.close();
 	}
-
-	// Now scan through the contents of the MIDI file to find the offset
-	// of each individual track, in order to create a mapping from MIDI
-	// offset to track number, for the enhanced MIDI soundtrack.
-	// The first song is always at position 4. The subsequent ones are
-	// calculated dynamically.
-	uint32 curOffset = 4;
-	uint32 curTrack = 0;
-	uint32 songLength = 0;
-
-	// Init
-	for (int i = 0; i < ARRAYSIZE(g_midiOffsets); i++)
-		g_midiOffsets[i] = 0;
-
-	while (!midiStream.eos() && !midiStream.err()) {
-		if (curOffset + (4 * curTrack) >= (uint32)midiStream.size())
-			break;
-
-		assert(curTrack < ARRAYSIZE(g_midiOffsets));
-		g_midiOffsets[curTrack] = curOffset + (4 * curTrack);
-		//debug("%d: %d", curTrack, midiOffsets[curTrack]);
-
-		songLength = midiStream.readUint32LE();
-		curOffset += songLength;
-		midiStream.skip(songLength);
-
-		curTrack++;
-	}
-
-	midiStream.close();
 }
 
 void DeleteMidiBuffer() {
@@ -378,8 +374,95 @@ void DeleteMidiBuffer() {
 	g_midiBuffer.pDat = NULL;
 }
 
-MidiMusicPlayer::MidiMusicPlayer() {
-	MidiPlayer::createDriver();
+MidiMusicPlayer::MidiMusicPlayer(TinselEngine *vm) {
+	_driver = NULL;
+	_milesAudioMode = false;
+	bool milesAudioEnabled = false;
+
+	if (vm->getPlatform() == Common::kPlatformDOS) {
+		// Enable Miles Audio for DOS platform only...
+		switch (vm->getGameID()) {
+		case GID_DW1:
+			if (!vm->getIsADGFDemo()) {
+				// ...for Discworld 1
+				milesAudioEnabled = true;
+			} else {
+				if (vm->isV1CD()) {
+					// ...and for Discworld 1 CD Demo
+					milesAudioEnabled = true;
+				}
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (milesAudioEnabled) {
+		// Discworld 1 (DOS) uses Miles Audio 3
+		// use our own Miles Audio drivers
+		//
+		// It seems that there are multiple versions of Discworld 1
+		//
+		// Version 1:
+		// Has SAMPLE.AD for AdLib and SAMPLE.OPL for OPL-3
+		// Timbre files are inside a subdirectory of the CD called "/drivers". Main game files are in
+		// another subdirectory, which means the user has to copy those files over.
+		// Installer script copies all drivers directly to harddrive without name changes
+		//
+		// Version 2:
+		// Has FAT.OPL only (gets copied by the installer into MIDPAK.AD or MIDPAK.OPL)
+		// Timbre file is inside subdirectory "drivers" right in the main game directory.
+		// Installer copies FAT.OPL to MIDPAK.AD all the time, even when user selected AWE32
+		//
+		// Neither have timbre data for MT32
+
+		::MidiDriver::DeviceHandle dev = ::MidiDriver::detectDevice(MDT_MIDI | MDT_ADLIB | MDT_PREFER_GM);
+		::MusicType musicType = ::MidiDriver::getMusicType(dev);
+		Common::File fileClass;
+
+		switch (musicType) {
+		case MT_ADLIB:
+			if (fileClass.exists("FAT.OPL")) {
+				// Version 2: fat.opl, may be in drivers-subdirectory
+				_driver = Audio::MidiDriver_Miles_AdLib_create("", "FAT.OPL");
+			} else {
+				if (fileClass.exists("MIDPAK.AD")) {
+					// Version 2: drivers got installed and fat.opl got copied over by the user
+					_driver = Audio::MidiDriver_Miles_AdLib_create("MIDPAK.AD", "");
+				} else {
+					if ((fileClass.exists("SAMPLE.AD")) || (fileClass.exists("SAMPLE.OPL"))) {
+						// Version 1: sample.ad / sample.opl, have to be copied over by the user for this version
+						_driver = Audio::MidiDriver_Miles_AdLib_create("SAMPLE.AD", "SAMPLE.OPL");
+					} else {
+						error("MILES-ADLIB: timbre file not found (may be called FAT.OPL, MIDPAK.AD, SAMPLE.AD or SAMPLE.OPL, may be in a subdirectory)");
+					}
+				}
+			}
+			break;
+		case MT_MT32:
+			// Discworld 1 doesn't have a MT32 timbre file
+			_driver = Audio::MidiDriver_Miles_MT32_create("");
+			break;
+		case MT_GM:
+			if (ConfMan.getBool("native_mt32")) {
+				_driver = Audio::MidiDriver_Miles_MT32_create("");
+				musicType = MT_MT32;
+			}
+			break;
+		default:
+			break;
+		}
+		if (!_driver) {
+			// nothing got created yet? -> create default driver
+			MidiPlayer::createDriver();
+		} else {
+			_milesAudioMode = true;
+		}
+
+	} else {
+		MidiPlayer::createDriver();
+	}
 
 	int ret = _driver->open();
 	if (ret == 0) {
@@ -399,6 +482,11 @@ void MidiMusicPlayer::setVolume(int volume) {
 }
 
 void MidiMusicPlayer::send(uint32 b) {
+	if (_milesAudioMode) {
+		_driver->send(b);
+		return;
+	}
+
 	Audio::MidiPlayer::send(b);
 
 	byte channel = (byte)(b & 0x0F);
@@ -412,7 +500,7 @@ void MidiMusicPlayer::send(uint32 b) {
 	}
 }
 
-void MidiMusicPlayer::playXMIDI(byte *midiData, uint32 size, bool loop) {
+void MidiMusicPlayer::playMIDI(uint32 size, bool loop) {
 	Common::StackLock lock(_mutex);
 
 	if (_isPlaying)
@@ -420,6 +508,13 @@ void MidiMusicPlayer::playXMIDI(byte *midiData, uint32 size, bool loop) {
 
 	stop();
 
+	if (TinselV1PSX)
+		playSEQ(size, loop);
+	else
+		playXMIDI(size, loop);
+}
+
+void MidiMusicPlayer::playXMIDI(uint32 size, bool loop) {
 	// It seems like not all music (the main menu music, for instance) set
 	// all the instruments explicitly. That means the music will sound
 	// different, depending on which music played before it. This appears
@@ -433,7 +528,78 @@ void MidiMusicPlayer::playXMIDI(byte *midiData, uint32 size, bool loop) {
 	// Load XMID resource data
 
 	MidiParser *parser = MidiParser::createParser_XMIDI();
-	if (parser->loadMusic(midiData, size)) {
+	if (parser->loadMusic(g_midiBuffer.pDat, size)) {
+		parser->setTrack(0);
+		parser->setMidiDriver(this);
+		parser->setTimerRate(getBaseTempo());
+		parser->property(MidiParser::mpCenterPitchWheelOnUnload, 1);
+		parser->property(MidiParser::mpSendSustainOffOnNotesOff, 1);
+
+		_parser = parser;
+
+		_isLooping = loop;
+		_isPlaying = true;
+	} else {
+		delete parser;
+	}
+}
+
+void MidiMusicPlayer::playSEQ(uint32 size, bool loop) {
+	// MIDI.DAT holds the file names in DW1 PSX
+	Common::String baseName((char *)g_midiBuffer.pDat, size);
+	Common::String seqName = baseName + ".SEQ";
+
+	// TODO: Load the instrument bank (<baseName>.VB and <baseName>.VH)
+
+	Common::File seqFile;
+	if (!seqFile.open(seqName))
+		error("Failed to open SEQ file '%s'", seqName.c_str());
+
+	if (seqFile.readUint32LE() != MKTAG('S', 'E', 'Q', 'p'))
+		error("Failed to find SEQp tag");
+
+	// Make sure we don't have a SEP file (with multiple SEQ's inside)
+	if (seqFile.readUint32BE() != 1)
+		error("Can only play SEQ files, not SEP");
+
+	uint16 ppqn = seqFile.readUint16BE();
+	uint32 tempo = seqFile.readUint16BE() << 8;
+	tempo |= seqFile.readByte();
+	/* uint16 beat = */ seqFile.readUint16BE();
+
+	// SEQ is directly based on SMF and we'll use that to our advantage here
+	// and convert to SMF and then use the SMF MidiParser.
+
+	// Calculate the SMF size we'll need
+	uint32 dataSize = seqFile.size() - 15;
+	uint32 actualSize = dataSize + 7 + 22;
+
+	// Resize the buffer if necessary
+	if (g_midiBuffer.size < actualSize) {
+		g_midiBuffer.pDat = (byte *)realloc(g_midiBuffer.pDat, actualSize);
+		assert(g_midiBuffer.pDat);
+	}
+
+	// Now construct the header
+	WRITE_BE_UINT32(g_midiBuffer.pDat, MKTAG('M', 'T', 'h', 'd'));
+	WRITE_BE_UINT32(g_midiBuffer.pDat + 4, 6); // header size
+	WRITE_BE_UINT16(g_midiBuffer.pDat + 8, 0); // type 0
+	WRITE_BE_UINT16(g_midiBuffer.pDat + 10, 1); // one track
+	WRITE_BE_UINT16(g_midiBuffer.pDat + 12, ppqn);
+	WRITE_BE_UINT32(g_midiBuffer.pDat + 14, MKTAG('M', 'T', 'r', 'k'));
+	WRITE_BE_UINT32(g_midiBuffer.pDat + 18, dataSize + 7); // SEQ data size + tempo change event size
+
+	// Add in a fake tempo change event
+	WRITE_BE_UINT32(g_midiBuffer.pDat + 22, 0x00FF5103); // no delta, meta event, tempo change, param size = 3
+	WRITE_BE_UINT16(g_midiBuffer.pDat + 26, tempo >> 8);
+	g_midiBuffer.pDat[28] = tempo & 0xFF;
+
+	// Now copy in the rest of the events
+	seqFile.read(g_midiBuffer.pDat + 29, dataSize);
+	seqFile.close();
+
+	MidiParser *parser = MidiParser::createParser_SMF();
+	if (parser->loadMusic(g_midiBuffer.pDat, actualSize)) {
 		parser->setTrack(0);
 		parser->setMidiDriver(this);
 		parser->setTimerRate(getBaseTempo());
@@ -473,9 +639,13 @@ PCMMusicPlayer::PCMMusicPlayer() {
 	_dimmed = false;
 	_dimmedTinsel = false;
 	_dimIteration = 0;
+	_dimmedVolume = 0;
+	_dimPosition = 0;
 
 	_fadeOutVolume = 0;
 	_fadeOutIteration = 0;
+
+	_hScript = _hSegment = 0;
 
 	_end = true;
 
@@ -743,8 +913,8 @@ bool PCMMusicPlayer::getNextChunk() {
 		// Set parameters for this chunk of music
 		id = _scriptNum;
 		while (id--)
-			script = scriptBuffer + READ_LE_UINT32(script);
-		snum = FROM_LE_32(script[_scriptIndex++]);
+			script = scriptBuffer + READ_32(script);
+		snum = FROM_32(script[_scriptIndex++]);
 
 		if (snum == MUSIC_JUMP || snum == MUSIC_END) {
 			// Let usual code sort it out!
@@ -756,11 +926,11 @@ bool PCMMusicPlayer::getNextChunk() {
 
 		musicSegments = (MusicSegment *) LockMem(_hSegment);
 
-		assert(FROM_LE_32(musicSegments[snum].numChannels) == 1);
-		assert(FROM_LE_32(musicSegments[snum].bitsPerSample) == 16);
+		assert(FROM_32(musicSegments[snum].numChannels) == 1);
+		assert(FROM_32(musicSegments[snum].bitsPerSample) == 16);
 
-		sampleOffset = FROM_LE_32(musicSegments[snum].sampleOffset);
-		sampleLength = FROM_LE_32(musicSegments[snum].sampleLength);
+		sampleOffset = FROM_32(musicSegments[snum].sampleOffset);
+		sampleLength = FROM_32(musicSegments[snum].sampleLength);
 		sampleCLength = (((sampleLength + 63) & ~63)*33)/64;
 
 		if (!file.open(_filename))
@@ -798,14 +968,14 @@ bool PCMMusicPlayer::getNextChunk() {
 
 		id = _scriptNum;
 		while (id--)
-			script = scriptBuffer + READ_LE_UINT32(script);
-		snum = FROM_LE_32(script[_scriptIndex]);
+			script = scriptBuffer + READ_32(script);
+		snum = FROM_32(script[_scriptIndex]);
 
 		if (snum == MUSIC_END) {
 			_state = S_END2;
 		} else {
 			if (snum == MUSIC_JUMP)
-				_scriptIndex = FROM_LE_32(script[_scriptIndex+1]);
+				_scriptIndex = FROM_32(script[_scriptIndex+1]);
 
 			_state = _forcePlay ? S_NEW : S_NEXT;
 			_forcePlay = false;
@@ -870,14 +1040,12 @@ void RestoreMidiFacts(SCNHANDLE	Midi, bool Loop) {
 	g_currentMidi = Midi;
 	g_currentLoop = Loop;
 
-	if (_vm->_config->_musicVolume != 0 && Loop) {
-		bool mute = false;
-		if (ConfMan.hasKey("mute"))
-			mute = ConfMan.getBool("mute");
+	bool mute = false;
+	if (ConfMan.hasKey("mute"))
+		mute = ConfMan.getBool("mute");
 
-		PlayMidiSequence(g_currentMidi, true);
-		SetMidiVolume(mute ? 0 : _vm->_config->_musicVolume);
-	}
+	PlayMidiSequence(g_currentMidi, true);
+	SetMidiVolume(mute ? 0 : _vm->_config->_musicVolume);
 }
 
 #if 0

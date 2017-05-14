@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -29,6 +29,7 @@
 
 #ifndef INTRO_H
 #define INTRO_H
+#include "graphics/surface.h"
 #include "graphics/fonts/winfont.h"
 
 namespace Hugo {
@@ -42,8 +43,8 @@ enum seqTextIntro {
 class IntroHandler {
 public:
 	IntroHandler(HugoEngine *vm);
-	Graphics::Surface surf;
-	Graphics::WinFont font;
+	Graphics::Surface _surf;
+	Graphics::WinFont _font;
 
 	virtual ~IntroHandler();
 
@@ -62,7 +63,7 @@ protected:
 	byte *_introX;
 	byte *_introY;
 	byte  _introXSize;
-	int16  introTicks;                              // Count calls to introPlay()
+	int16 _introTicks;                              // Count calls to introPlay()
 };
 
 class intro_v1w : public IntroHandler {

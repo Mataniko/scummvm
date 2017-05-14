@@ -1,6 +1,10 @@
 MODULE := engines/agos
 
 MODULE_OBJS := \
+	drivers/accolade/adlib.o \
+	drivers/accolade/driverfile.o \
+	drivers/accolade/mt32.o \
+	drivers/simon1/adlib.o \
 	agos.o \
 	charset.o \
 	charset-fontdata.o \
@@ -51,7 +55,6 @@ ifdef ENABLE_AGOS2
 MODULE_OBJS += \
 	animation.o \
 	feeble.o \
-	installshield_cab.o \
 	oracle.o \
 	script_dp.o \
 	script_ff.o \

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -145,9 +145,7 @@ void TextDisplayer_MR::printText(const char *str, int x, int y, uint8 c0, uint8 
 void TextDisplayer_MR::restoreScreen() {
 	_vm->restorePage3();
 	_vm->drawAnimObjects();
-	_screen->hideMouse();
 	_screen->copyRegion(_talkCoords.x, _talkMessageY, _talkCoords.x, _talkMessageY, _talkCoords.w, _talkMessageH, 2, 0, Screen::CR_NO_P_CHECK);
-	_screen->showMouse();
 	_vm->flagAnimObjsForRefresh();
 	_vm->refreshAnimObjects(0);
 }
@@ -261,8 +259,6 @@ void KyraEngine_MR::objectChatInit(const char *str, int object, int vocHigh, int
 
 	restorePage3();
 
-	_screen->hideMouse();
-
 	_chatTextEnabled = textEnabled();
 	if (_chatTextEnabled) {
 		objectChatPrintText(str, object);
@@ -277,8 +273,6 @@ void KyraEngine_MR::objectChatInit(const char *str, int object, int vocHigh, int
 	} else {
 		_chatVocHigh = _chatVocLow = -1;
 	}
-
-	_screen->showMouse();
 }
 
 void KyraEngine_MR::objectChatPrintText(const char *str, int object) {

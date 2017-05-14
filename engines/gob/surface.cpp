@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,111 +26,15 @@
 #include "common/stream.h"
 #include "common/util.h"
 #include "common/frac.h"
+#include "common/textconsole.h"
 
 #include "graphics/primitives.h"
 #include "graphics/pixelformat.h"
 #include "graphics/surface.h"
 
+#include "image/iff.h"
+
 namespace Gob {
-
-LBMLoader::LBMLoader(Common::SeekableReadStream &stream) : _parser(&stream),
-	_hasHeader(false), _palette(0), _image(0) {
-
-}
-
-bool LBMLoader::loadHeader(Graphics::BMHD &header) {
-	if (!readHeader())
-		return false;
-
-	header = _decoder._header;
-	return true;
-}
-
-bool LBMLoader::loadPalette(byte *palette) {
-	assert(!_palette);
-	assert(palette);
-
-	_palette = palette;
-
-	Common::Functor1Mem<Common::IFFChunk&, bool, LBMLoader> c(this, &LBMLoader::callbackPalette);
-	_parser.parse(c);
-
-	if (!_palette)
-		return false;
-
-	_palette = 0;
-	return true;
-}
-
-bool LBMLoader::loadImage(byte *image) {
-	assert(!_image);
-	assert(image);
-
-	if (!readHeader())
-		return false;
-
-	_image = image;
-
-	Common::Functor1Mem<Common::IFFChunk&, bool, LBMLoader> c(this, &LBMLoader::callbackImage);
-	_parser.parse(c);
-
-	if (!_image)
-		return false;
-
-	_image = 0;
-	return true;
-}
-
-bool LBMLoader::callbackHeader(Common::IFFChunk &chunk) {
-	if (chunk._type == ID_BMHD) {
-		if (chunk._size == sizeof(Graphics::BMHD)) {
-			_decoder.loadHeader(chunk._stream);
-			_hasHeader = true;
-		}
-
-		return true; // Stop the IFF parser
-	}
-
-	return false;
-}
-
-bool LBMLoader::callbackPalette(Common::IFFChunk &chunk) {
-	assert(_palette);
-
-	if (chunk._type == ID_CMAP) {
-		if (chunk._size == 768) {
-			if (chunk._stream->read(_palette, chunk._size) != chunk._size)
-				_palette = 0;
-		} else
-			_palette = 0;
-
-		return true; // Stop the IFF parser
-	}
-
-	return false;
-}
-
-bool LBMLoader::callbackImage(Common::IFFChunk &chunk) {
-	assert(_image);
-
-	if (chunk._type == ID_BODY) {
-		_decoder.loadBitmap(Graphics::ILBMDecoder::ILBM_UNPACK_PLANES, _image, chunk._stream);
-		return true;
-	}
-
-	return false;
-}
-
-bool LBMLoader::readHeader() {
-	if (_hasHeader)
-		return true;
-
-	Common::Functor1Mem<Common::IFFChunk&, bool, LBMLoader> c(this, &LBMLoader::callbackHeader);
-	_parser.parse(c);
-
-	return _hasHeader;
-}
-
 
 static void plotPixel(int x, int y, int color, void *data) {
 	Surface *dest = (Surface *)data;
@@ -142,7 +46,7 @@ static void plotPixel(int x, int y, int color, void *data) {
 Pixel::Pixel(byte *vidMem, uint8 bpp, byte *min, byte *max) :
 	_vidMem(vidMem), _bpp(bpp), _min(min), _max(max) {
 
-	assert((_bpp == 1) || (_bpp == 2));
+	assert((_bpp == 1) || (_bpp == 2) || (_bpp == 4));
 	assert(_vidMem >= _min);
 	assert(_vidMem <  _max);
 }
@@ -188,6 +92,8 @@ uint32 Pixel::get() const {
 		return *((byte *) _vidMem);
 	if (_bpp == 2)
 		return *((uint16 *) _vidMem);
+	if (_bpp == 4)
+		return *((uint32 *) _vidMem);
 
 	return 0;
 }
@@ -200,6 +106,8 @@ void Pixel::set(uint32 p) {
 		*((byte *) _vidMem) = (byte) p;
 	if (_bpp == 2)
 		*((uint16 *) _vidMem) = (uint16) p;
+	if (_bpp == 4)
+		*((uint32 *) _vidMem) = (uint32) p;
 }
 
 bool Pixel::isValid() const {
@@ -210,7 +118,7 @@ bool Pixel::isValid() const {
 ConstPixel::ConstPixel(const byte *vidMem, uint8 bpp, const byte *min, const byte *max) :
 	_vidMem(vidMem), _bpp(bpp), _min(min), _max(max) {
 
-	assert((_bpp == 1) || (_bpp == 2));
+	assert((_bpp == 1) || (_bpp == 2) || (_bpp == 4));
 	assert(_vidMem >= _min);
 	assert(_vidMem <  _max);
 }
@@ -256,6 +164,8 @@ uint32 ConstPixel::get() const {
 		return *((const byte *) _vidMem);
 	if (_bpp == 2)
 		return *((const uint16 *) _vidMem);
+	if (_bpp == 4)
+		return *((const uint32 *) _vidMem);
 
 	return 0;
 }
@@ -269,7 +179,7 @@ Surface::Surface(uint16 width, uint16 height, uint8 bpp, byte *vidMem) :
 	_width(width), _height(height), _bpp(bpp), _vidMem(vidMem) {
 
 	assert((_width > 0) && (_height > 0));
-	assert((_bpp == 1) || (_bpp == 2));
+	assert((_bpp == 1) || (_bpp == 2) || (_bpp == 4));
 
 	if (!_vidMem) {
 		_vidMem    = new byte[_bpp * _width * _height];
@@ -278,6 +188,18 @@ Surface::Surface(uint16 width, uint16 height, uint8 bpp, byte *vidMem) :
 		memset(_vidMem, 0, _bpp * _width * _height);
 	} else
 		_ownVidMem = false;
+}
+
+Surface::Surface(uint16 width, uint16 height, uint8 bpp, const byte *vidMem) :
+	_width(width), _height(height), _bpp(bpp), _vidMem(0) {
+
+	assert((_width > 0) && (_height > 0));
+	assert((_bpp == 1) || (_bpp == 2) || (_bpp == 4));
+
+	_vidMem    = new byte[_bpp * _width * _height];
+	_ownVidMem = true;
+
+	memcpy(_vidMem, vidMem, _bpp * _width * _height);
 }
 
 Surface::~Surface() {
@@ -548,7 +470,7 @@ void Surface::blitScaled(const Surface &from, Common::Rational scale, int32 tran
 	blitScaled(from, 0, 0, from._width - 1, from._height - 1, 0, 0, scale, transp);
 }
 
-void Surface::fillRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uint32 color) {
+void Surface::fillRect(int16 left, int16 top, int16 right, int16 bottom, uint32 color) {
 	// Just in case those are swapped
 	if (left > right)
 		SWAP(left, right);
@@ -558,6 +480,11 @@ void Surface::fillRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uin
 	if ((left >= _width) || (top >= _height))
 		// Nothing to do
 		return;
+
+	left   = CLIP<int32>(left  , 0, _width  - 1);
+	top    = CLIP<int32>(top   , 0, _height - 1);
+	right  = CLIP<int32>(right , 0, _width  - 1);
+	bottom = CLIP<int32>(bottom, 0, _height - 1);
 
 	// Area to actually fill
 	uint16 width  = CLIP<int32>(right  - left + 1, 0, _width  - left);
@@ -589,7 +516,7 @@ void Surface::fillRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uin
 		return;
 	}
 
-	assert(_bpp == 2);
+	assert((_bpp == 2) || (_bpp == 4));
 
 	// Otherwise, we have to fill by pixel
 
@@ -672,6 +599,12 @@ void Surface::shadeRect(uint16 left, uint16 top, uint16 right, uint16 bottom,
 
 }
 
+void Surface::recolor(uint8 from, uint8 to) {
+	for (Pixel p = get(); p.isValid(); ++p)
+		if (p.get() == from)
+			p.set(to);
+}
+
 void Surface::putPixel(uint16 x, uint16 y, uint32 color) {
 	if ((x >= _width) || (y >= _height))
 		return;
@@ -681,6 +614,34 @@ void Surface::putPixel(uint16 x, uint16 y, uint32 color) {
 
 void Surface::drawLine(uint16 x0, uint16 y0, uint16 x1, uint16 y1, uint32 color) {
 	Graphics::drawLine(x0, y0, x1, y1, color, &plotPixel, this);
+}
+
+void Surface::drawRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uint32 color) {
+	// Just in case those are swapped
+	if (left > right)
+		SWAP(left, right);
+	if (top  > bottom)
+		SWAP(top, bottom);
+
+	if ((left >= _width) || (top >= _height))
+		// Nothing to do
+		return;
+
+	// Area to actually draw
+	const uint16 width  = CLIP<int32>(right  - left + 1, 0, _width  - left);
+	const uint16 height = CLIP<int32>(bottom - top  + 1, 0, _height - top);
+
+	if ((width == 0) || (height == 0))
+		// Nothing to do
+		return;
+
+	right  = left + width  - 1;
+	bottom = top  + height - 1;
+
+	drawLine(left , top   , left , bottom, color);
+	drawLine(right, top   , right, bottom, color);
+	drawLine(left , top   , right, top   , color);
+	drawLine(left , bottom, right, bottom, color);
 }
 
 /*
@@ -795,8 +756,8 @@ bool Surface::loadImage(Common::SeekableReadStream &stream, ImageType type) {
 	switch (type) {
 	case kImageTypeTGA:
 		return loadTGA(stream);
-	case kImageTypeLBM:
-		return loadLBM(stream);
+	case kImageTypeIFF:
+		return loadIFF(stream);
 	case kImageTypeBRC:
 		return loadBRC(stream);
 	case kImageTypeBMP:
@@ -825,7 +786,7 @@ ImageType Surface::identifyImage(Common::SeekableReadStream &stream) {
 	stream.seek(startPos);
 
 	if (!strncmp(buffer    , "FORM", 4))
-		return kImageTypeLBM;
+		return kImageTypeIFF;
 	if (!strncmp(buffer + 6, "JFIF", 4))
 		return kImageTypeJPEG;
 	if (!strncmp(buffer    , "BRC" , 3))
@@ -858,20 +819,17 @@ bool Surface::loadTGA(Common::SeekableReadStream &stream) {
 	return false;
 }
 
-bool Surface::loadLBM(Common::SeekableReadStream &stream) {
+bool Surface::loadIFF(Common::SeekableReadStream &stream) {
+	Image::IFFDecoder decoder;
+	decoder.loadStream(stream);
 
-	LBMLoader loader(stream);
-
-	Graphics::BMHD header;
-	loader.loadHeader(header);
-
-	if (header.depth != 8)
-		// Only 8bpp LBMs supported for now
+	if (!decoder.getSurface())
 		return false;
 
-	resize(header.width, header.height);
+	resize(decoder.getSurface()->w, decoder.getSurface()->h);
+	memcpy(_vidMem, decoder.getSurface()->getPixels(), decoder.getSurface()->w * decoder.getSurface()->h);
 
-	return loader.loadImage(_vidMem);
+	return true;
 }
 
 bool Surface::loadBRC(Common::SeekableReadStream &stream) {

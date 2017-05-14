@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -78,22 +78,22 @@ void FileManager_v2d::closeDatabaseFiles() {
 void FileManager_v2d::readBackground(const int screenIndex) {
 	debugC(1, kDebugFile, "readBackground(%d)", screenIndex);
 
-	_sceneryArchive1.seek((uint32) screenIndex * sizeof(sceneBlock_t), SEEK_SET);
+	_sceneryArchive1.seek((uint32) screenIndex * sizeof(SceneBlock), SEEK_SET);
 
-	sceneBlock_t sceneBlock;                        // Read a database header entry
-	sceneBlock.scene_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.scene_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.b_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.b_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.o_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.o_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.ob_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.ob_len = _sceneryArchive1.readUint32LE();
+	SceneBlock sceneBlock;                          // Read a database header entry
+	sceneBlock._sceneOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._sceneLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._boundaryOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._boundaryLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._overlayOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._overlayLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._baseOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._baseLength = _sceneryArchive1.readUint32LE();
 
-	_sceneryArchive1.seek(sceneBlock.scene_off, SEEK_SET);
+	_sceneryArchive1.seek(sceneBlock._sceneOffset, SEEK_SET);
 
 	// Read the image into dummy seq and static dib_a
-	seq_t *dummySeq;                                // Image sequence structure for Read_pcx
+	Seq *dummySeq;                                  // Image sequence structure for Read_pcx
 	dummySeq = readPCX(_sceneryArchive1, 0, _vm->_screen->getFrontBuffer(), true, _vm->_text->getScreenNames(screenIndex));
 	free(dummySeq);
 }
@@ -101,35 +101,35 @@ void FileManager_v2d::readBackground(const int screenIndex) {
 /**
  * Open and read in an overlay file, close file
  */
-void FileManager_v2d::readOverlay(const int screenNum, image_pt image, ovl_t overlayType) {
+void FileManager_v2d::readOverlay(const int screenNum, ImagePtr image, OvlType overlayType) {
 	debugC(1, kDebugFile, "readOverlay(%d, ...)", screenNum);
 
-	image_pt tmpImage = image;                  // temp ptr to overlay file
-	_sceneryArchive1.seek((uint32)screenNum * sizeof(sceneBlock_t), SEEK_SET);
+	ImagePtr tmpImage = image;                      // temp ptr to overlay file
+	_sceneryArchive1.seek((uint32)screenNum * sizeof(SceneBlock), SEEK_SET);
 
-	sceneBlock_t sceneBlock;                        // Database header entry
-	sceneBlock.scene_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.scene_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.b_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.b_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.o_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.o_len = _sceneryArchive1.readUint32LE();
-	sceneBlock.ob_off = _sceneryArchive1.readUint32LE();
-	sceneBlock.ob_len = _sceneryArchive1.readUint32LE();
+	SceneBlock sceneBlock;                          // Database header entry
+	sceneBlock._sceneOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._sceneLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._boundaryOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._boundaryLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._overlayOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._overlayLength = _sceneryArchive1.readUint32LE();
+	sceneBlock._baseOffset = _sceneryArchive1.readUint32LE();
+	sceneBlock._baseLength = _sceneryArchive1.readUint32LE();
 
 	uint32 i = 0;
 	switch (overlayType) {
 	case kOvlBoundary:
-		_sceneryArchive1.seek(sceneBlock.b_off, SEEK_SET);
-		i = sceneBlock.b_len;
+		_sceneryArchive1.seek(sceneBlock._boundaryOffset, SEEK_SET);
+		i = sceneBlock._boundaryLength;
 		break;
 	case kOvlOverlay:
-		_sceneryArchive1.seek(sceneBlock.o_off, SEEK_SET);
-		i = sceneBlock.o_len;
+		_sceneryArchive1.seek(sceneBlock._overlayOffset, SEEK_SET);
+		i = sceneBlock._overlayLength;
 		break;
 	case kOvlBase:
-		_sceneryArchive1.seek(sceneBlock.ob_off, SEEK_SET);
-		i = sceneBlock.ob_len;
+		_sceneryArchive1.seek(sceneBlock._baseOffset, SEEK_SET);
+		i = sceneBlock._baseLength;
 		break;
 	default:
 		error("Bad overlayType: %d", overlayType);

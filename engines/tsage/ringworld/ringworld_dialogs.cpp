@@ -8,22 +8,17 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
-
-#include "common/translation.h"
-
-#include "gui/dialog.h"
-#include "gui/widget.h"
 
 #include "tsage/tsage.h"
 #include "tsage/core.h"
@@ -59,7 +54,7 @@ void RightClickButton::highlight() {
 		_savedButton = NULL;
 	} else {
 		// Highlight button by getting the needed highlighted image resource
-		_savedButton = Surface_getArea(g_globals->gfxManager().getSurface(), _bounds);
+		_savedButton = surfaceGetArea(g_globals->gfxManager().getSurface(), _bounds);
 
 		uint size;
 		byte *imgData = g_resourceManager->getSubResource(7, 2, _buttonIndex, &size);
@@ -122,7 +117,7 @@ RightClickButton *RightClickDialog::findButton(const Common::Point &pt) {
 
 void RightClickDialog::draw() {
 	// Save the covered background area
-	_savedArea = Surface_getArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
+	_savedArea = surfaceGetArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
 
 	// Draw the dialog image
 	g_globals->gfxManager().copyFrom(_surface, _bounds.left, _bounds.top);
@@ -183,7 +178,7 @@ void RightClickDialog::execute() {
 		}
 
 		g_system->delayMillis(10);
-		GLOBALS._screenSurface.updateScreen();
+		GLOBALS._screen.update();
 	}
 
 	_gfxManager.deactivate();
@@ -385,7 +380,6 @@ void InventoryDialog::execute() {
 	if ((RING_INVENTORY._selectedItem) && RING_INVENTORY._selectedItem->inInventory())
 		RING_INVENTORY._selectedItem->setCursor();
 
-	GfxElement *hiliteObj;
 	bool lookFlag = false;
 	_gfxManager.activate();
 
@@ -394,12 +388,12 @@ void InventoryDialog::execute() {
 		Event event;
 		while (!g_globals->_events.getEvent(event) && !g_vm->shouldQuit()) {
 			g_system->delayMillis(10);
-			GLOBALS._screenSurface.updateScreen();
+			GLOBALS._screen.update();
 		}
 		if (g_vm->shouldQuit())
 			break;
 
-		hiliteObj = NULL;
+		GfxElement *hiliteObj = nullptr;
 		if ((event.eventType == EVENT_BUTTON_DOWN) && !_bounds.contains(event.mousePos))
 			break;
 
@@ -442,7 +436,7 @@ void InventoryDialog::execute() {
 			// Inventory item selected
 			InvObject *invObject = static_cast<GfxInvImage *>(hiliteObj)->_invObject;
 			if (lookFlag) {
-				g_globals->_screenSurface.displayText(invObject->_description);
+				g_globals->_screen.displayText(invObject->_description);
 			} else {
 				RING_INVENTORY._selectedItem = invObject;
 				invObject->setCursor();

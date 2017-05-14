@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -296,10 +296,8 @@ void KyraEngine_LoK::characterSays(int vocFile, const char *chatStr, int8 charNu
 		_animator->restoreAllObjectBackgrounds();
 
 		_screen->copyRegion(12, _text->_talkMessageY, 12, 136, 296, _text->_talkMessageH, 2, 2);
-		_screen->hideMouse();
 
 		_text->printCharacterText(processedString, charNum, _characterList[charNum].x1);
-		_screen->showMouse();
 	}
 
 	if (chatDuration == -2)
@@ -317,10 +315,8 @@ void KyraEngine_LoK::characterSays(int vocFile, const char *chatStr, int8 charNu
 		_screen->copyRegion(12, 136, 12, _text->_talkMessageY, 296, _text->_talkMessageH, 2, 2);
 		_animator->preserveAllBackgrounds();
 		_animator->prepDrawAllObjects();
-		_screen->hideMouse();
 
 		_screen->copyRegion(12, _text->_talkMessageY, 12, _text->_talkMessageY, 296, _text->_talkMessageH, 2, 0);
-		_screen->showMouse();
 		_animator->flagAllObjectsForRefresh();
 		_animator->copyChangedObjectsForward(0);
 	}
@@ -332,7 +328,6 @@ void KyraEngine_LoK::characterSays(int vocFile, const char *chatStr, int8 charNu
 }
 
 void KyraEngine_LoK::drawSentenceCommand(const char *sentence, int color) {
-	_screen->hideMouse();
 	_screen->fillRect(8, 143, 311, 152, _flags.platform == Common::kPlatformAmiga ? 19 : 12);
 
 	if (_flags.platform == Common::kPlatformAmiga) {
@@ -354,7 +349,6 @@ void KyraEngine_LoK::drawSentenceCommand(const char *sentence, int color) {
 	}
 
 	_text->printText(sentence, 8, 143, 0xFF, _flags.platform == Common::kPlatformAmiga ? 19 : 12, 0);
-	_screen->showMouse();
 	setTextFadeTimerCountdown(15);
 	_fadeText = false;
 }

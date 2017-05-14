@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -23,6 +23,10 @@
 #include "sci/engine/gc.h"
 #include "common/array.h"
 #include "sci/graphics/ports.h"
+
+#ifdef ENABLE_SCI32
+#include "sci/graphics/controls32.h"
+#endif
 
 namespace Sci {
 
@@ -42,12 +46,12 @@ const char *segmentTypeNames[] = {
 	"dynmem",    // 9
 	"obsolete",  // 10: obsolete string fragments
 	"array",     // 11: SCI32 arrays
-	"string"     // 12: SCI32 strings
+	"obsolete"   // 12: obsolete SCI32 strings
 };
 #endif
 
 void WorklistManager::push(reg_t reg) {
-	if (!reg.segment) // No numbers
+	if (!reg.getSegment()) // No numbers
 		return;
 
 	debugC(kDebugLevelGC, "[GC] Adding %04x:%04x", PRINT_REG(reg));
@@ -69,7 +73,7 @@ static AddrSet *normalizeAddresses(SegManager *segMan, const AddrSet &nonnormal_
 
 	for (AddrSet::const_iterator i = nonnormal_map.begin(); i != nonnormal_map.end(); ++i) {
 		reg_t reg = i->_key;
-		SegmentObj *mobj = segMan->getSegmentObj(reg.segment);
+		SegmentObj *mobj = segMan->getSegmentObj(reg.getSegment());
 
 		if (mobj) {
 			reg = mobj->findCanonicAddress(segMan, reg);
@@ -85,11 +89,11 @@ static void processWorkList(SegManager *segMan, WorklistManager &wm, const Commo
 	while (!wm._worklist.empty()) {
 		reg_t reg = wm._worklist.back();
 		wm._worklist.pop_back();
-		if (reg.segment != stackSegment) { // No need to repeat this one
+		if (reg.getSegment() != stackSegment) { // No need to repeat this one
 			debugC(kDebugLevelGC, "[GC] Checking %04x:%04x", PRINT_REG(reg));
-			if (reg.segment < heap.size() && heap[reg.segment]) {
+			if (reg.getSegment() < heap.size() && heap[reg.getSegment()]) {
 				// Valid heap object? Find its outgoing references!
-				wm.pushArray(heap[reg.segment]->listAllOutgoingReferences(reg));
+				wm.pushArray(heap[reg.getSegment()]->listAllOutgoingReferences(reg));
 			}
 		}
 	}
@@ -139,14 +143,29 @@ AddrSet *findAllActiveReferences(EngineState *s) {
 	const Common::Array<SegmentObj *> &heap = s->_segMan->getSegments();
 	uint heapSize = heap.size();
 
-	// Init: Explicitly loaded scripts
 	for (uint i = 1; i < heapSize; i++) {
-		if (heap[i] && heap[i]->getType() == SEG_TYPE_SCRIPT) {
-			Script *script = (Script *)heap[i];
+		if (heap[i]) {
+			// Init: Explicitly loaded scripts
+			if (heap[i]->getType() == SEG_TYPE_SCRIPT) {
+				Script *script = (Script *)heap[i];
 
-			if (script->getLockers()) { // Explicitly loaded?
-				wm.pushArray(script->listObjectReferences());
+				if (script->getLockers()) { // Explicitly loaded?
+					wm.pushArray(script->listObjectReferences());
+				}
 			}
+
+#ifdef ENABLE_SCI32
+			// Init: Explicitly opted-out bitmaps
+			else if (heap[i]->getType() == SEG_TYPE_BITMAP) {
+				BitmapTable *bt = static_cast<BitmapTable *>(heap[i]);
+
+				for (uint j = 0; j < bt->_table.size(); j++) {
+					if (bt->_table[j].data && bt->_table[j].data->getShouldGC() == false) {
+						wm.push(make_reg(i, j));
+					}
+				}
+			}
+#endif
 		}
 	}
 

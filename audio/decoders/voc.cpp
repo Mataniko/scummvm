@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -321,9 +321,14 @@ void VocStream::preProcess() {
 		// In case we hit a "Terminator" block we also break here.
 		if (_stream->eos() || block.code == 0)
 			break;
-		// We also allow 128 as terminator, since Simon 1 Amiga CD32 uses it.
-		if (block.code == 128) {
-			debug(3, "VocStream::preProcess: Caught 128 as terminator");
+		// We will allow invalid block numbers as terminators. This is needed,
+		// since some games ship broken VOC files. The following occasions are
+		// known:
+		// - 128 is used as terminator in Simon 1 Amiga CD32
+		// - Full Throttle contains a VOC file with an incorrect block length
+		//   resulting in a sample (127) to be read as block code.
+		if (block.code > 9) {
+			warning("VocStream::preProcess: Caught %d as terminator", block.code);
 			break;
 		}
 
@@ -482,7 +487,8 @@ void VocStream::preProcess() {
 
 		default:
 			warning("Unhandled code %d in VOC file (len %d)", block.code, block.length);
-			return;
+			// Skip the whole block and try to use the next one.
+			skip = block.length;
 		}
 
 		// Premature end of stream => error!
@@ -553,7 +559,7 @@ SeekableAudioStream *makeVOCStream(Common::SeekableReadStream *stream, byte flag
 
 	SeekableAudioStream *audioStream = new VocStream(stream, (flags & Audio::FLAG_UNSIGNED) != 0, disposeAfterUse);
 
-	if (audioStream && audioStream->endOfData()) {
+	if (audioStream->endOfData()) {
 		delete audioStream;
 		return 0;
 	} else {

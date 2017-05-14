@@ -8,23 +8,20 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
 
-// see if all engines using this class are DISABLED
-#if !defined(ENABLE_SCUMM)
-
-// normal Header Guard
-#elif !defined(AUDIO_MODS_TFMX_H)
+// Only compiled if SCUMM is built-in or we're building for dynamic modules
+#if !defined(AUDIO_MODS_TFMX_H) && (defined(ENABLE_SCUMM) || defined(DYNAMIC_MODULES))
 #define AUDIO_MODS_TFMX_H
 
 #include "audio/mods/paula.h"
@@ -276,6 +273,6 @@ private:
 	void noteCommand(uint8 note, uint8 param1, uint8 param2, uint8 param3);
 };
 
-}	// End of namespace Audio
+} // End of namespace Audio
 
 #endif // !defined(AUDIO_MODS_TFMX_H)

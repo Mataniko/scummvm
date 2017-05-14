@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -23,6 +23,7 @@
 #include "agos/agos.h"
 #include "agos/animation.h"
 #include "agos/debugger.h"
+#include "agos/sound.h"
 #include "agos/intern.h"
 
 #include "common/events.h"
@@ -365,7 +366,7 @@ void AGOSEngine::drawStuff(const byte *src, uint xoffs) {
 	const uint8 y = (getPlatform() == Common::kPlatformAtariST) ? 132 : 135;
 
 	Graphics::Surface *screen = _system->lockScreen();
-	byte *dst = (byte *)screen->pixels + y * screen->pitch + xoffs;
+	byte *dst = (byte *)screen->getBasePtr(xoffs, y);
 
 	for (uint h = 0; h < 6; h++) {
 		memcpy(dst, src, 4);
@@ -427,7 +428,7 @@ void AGOSEngine::delay(uint amount) {
 	uint32 cur = start;
 	uint this_delay, vgaPeriod;
 
-	_system->getAudioCDManager()->updateCD();
+	_system->getAudioCDManager()->update();
 
 	_debugger->onFrame();
 
@@ -467,11 +468,15 @@ void AGOSEngine::delay(uint amount) {
 					memset(_saveLoadName, 0, sizeof(_saveLoadName));
 					sprintf(_saveLoadName, "Quick %d", _saveLoadSlot);
 					_saveLoadType = (event.kbd.hasFlags(Common::KBD_ALT)) ? 1 : 2;
-
-					// We should only allow a load or save when it was possible in original
-					// This stops load/save during copy protection, conversations and cut scenes
-					if (!_mouseHideCount && !_showPreposition)
-						quickLoadOrSave();
+					quickLoadOrSave();
+				} else if (event.kbd.hasFlags(Common::KBD_ALT)) {
+					if (event.kbd.keycode == Common::KEYCODE_u) {
+						dumpAllSubroutines();
+					} else if (event.kbd.keycode == Common::KEYCODE_i) {
+						dumpAllVgaImageFiles();
+					} else if (event.kbd.keycode == Common::KEYCODE_v) {
+						dumpAllVgaScriptFiles();
+					}
 				} else if (event.kbd.hasFlags(Common::KBD_CTRL)) {
 					if (event.kbd.keycode == Common::KEYCODE_a) {
 						GUI::Dialog *_aboutDialog;
@@ -481,10 +486,6 @@ void AGOSEngine::delay(uint amount) {
 						_fastMode = !_fastMode;
 					} else if (event.kbd.keycode == Common::KEYCODE_d) {
 						_debugger->attach();
-					} else if (event.kbd.keycode == Common::KEYCODE_s) {
-						dumpAllSubroutines();
-					} else if (event.kbd.keycode == Common::KEYCODE_i) {
-						dumpAllVgaImageFiles();
 					}
 				}
 
@@ -524,6 +525,12 @@ void AGOSEngine::delay(uint amount) {
 			case Common::EVENT_RTL:
 			case Common::EVENT_QUIT:
 				return;
+			case Common::EVENT_WHEELUP:
+				handleMouseWheelUp();
+				break;
+			case Common::EVENT_WHEELDOWN:
+				handleMouseWheelDown();
+				break;
 			default:
 				break;
 			}
@@ -532,7 +539,7 @@ void AGOSEngine::delay(uint amount) {
 		if (_leftButton == 1)
 			_leftButtonCount++;
 
-		_system->getAudioCDManager()->updateCD();
+		_system->getAudioCDManager()->update();
 
 		_system->updateScreen();
 

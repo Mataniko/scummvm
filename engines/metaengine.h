@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #ifndef ENGINES_METAENGINE_H
@@ -95,6 +96,9 @@ public:
 	/**
 	 * Return a list of all save states associated with the given target.
 	 *
+	 * The returned list is guaranteed to be sorted by slot numbers. That
+	 * means smaller slot numbers are always stored before bigger slot numbers.
+	 *
 	 * The caller has to ensure that this (Meta)Engine is responsible
 	 * for the specified target (by using findGame on it respectively
 	 * on the associated gameid from the relevant ConfMan entry, if present).
@@ -112,10 +116,17 @@ public:
 	}
 
 	/**
-	 * Return a list of extra GUI options.
+	 * Return a list of extra GUI options for the specified target.
+	 * If no target is specified, all of the available custom GUI options are
+	 * Returned for the plugin (used to set default values).
+	 *
 	 * Currently, this only supports options with checkboxes.
 	 *
 	 * The default implementation returns an empty list.
+	 *
+	 * @param target    name of a config manager target
+	 * @return          a list of extra GUI options for an engine plugin and
+	 *                  target
 	 */
 	virtual const ExtraGuiOptions getExtraGuiOptions(const Common::String &target) const {
 		return ExtraGuiOptions();
@@ -225,7 +236,19 @@ public:
 		 * the game till the save.
 		 * This flag may only be set when 'kSavesSupportMetaInfo' is set.
 		 */
-		kSavesSupportPlayTime
+		kSavesSupportPlayTime,
+
+		/**
+		* Feature is available if engine's saves could be detected
+		* with "<target>.###" pattern and "###" corresponds to slot
+		* number.
+		*
+		* If that's not true or engine is using some unusual way
+		* of detecting saves and slot numbers, this should be
+		* unavailable. In that case Save/Load dialog for engine's
+		* games is locked during cloud saves sync.
+		*/
+		kSimpleSavesNames
 	};
 
 	/**

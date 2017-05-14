@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -58,7 +58,7 @@ public:
 	int16 getWidth() { return 0; }
 	void setPalette(const byte *colors, uint start, uint num) {}
 	void grabPalette(byte *colors, uint start, uint num) {}
-	void copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) {}
+	void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {}
 	Graphics::Surface *lockScreen() { return NULL; }
 	void unlockScreen() {}
 	void fillScreen(uint32 col) {}
@@ -71,14 +71,14 @@ public:
 	void hideOverlay() {}
 	Graphics::PixelFormat getOverlayFormat() const { return Graphics::PixelFormat(); }
 	void clearOverlay() {}
-	void grabOverlay(OverlayColor *buf, int pitch) {}
-	void copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {}
+	void grabOverlay(void *buf, int pitch) {}
+	void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {}
 	int16 getOverlayHeight() { return 0; }
 	int16 getOverlayWidth() { return 0; }
 
 	bool showMouse(bool visible) { return !visible; }
 	void warpMouse(int x, int y) {}
-	void setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, int cursorTargetScale = 1, const Graphics::PixelFormat *format = NULL) {}
+	void setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale = false, const Graphics::PixelFormat *format = NULL) {}
 	void setCursorPalette(const byte *colors, uint start, uint num) {}
 };
 

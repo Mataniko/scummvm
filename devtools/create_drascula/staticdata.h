@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -6031,10 +6031,10 @@ const char *_texthis[NUM_LANGS][NUM_TEXTHIS] = {
 },
 {
 	"",
-	"",
-	"",
-	"",
-	""
+	"Hace mucho tiempo, parece ser que Drascula mato a la mujer de Von Braun, asi que, con la intencion de enfrentarse al conde, Von Braun empezo a investigar todo lo que pudo sobre vampiros.",
+	"Cuando creyo estar preparado, subio al castillo y tuvo un enfrentamiento muy violento con Drascula.",
+	"Nadie sabe que paso exactamente. Aunque Von Braun perdio, Drascula no pudo matarlo.",
+	"Von Braun se sintio humillado por su derrota, huyo del castillo y no ha tenido valor para enfrentarse de nuevo a Drascula."
 },
 {
 	"",

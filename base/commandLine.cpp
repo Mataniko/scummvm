@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -35,6 +35,7 @@
 #include "common/config-manager.h"
 #include "common/fs.h"
 #include "common/rendermode.h"
+#include "common/stack.h"
 #include "common/system.h"
 #include "common/textconsole.h"
 
@@ -57,7 +58,7 @@ static const char USAGE_STRING[] =
 ;
 
 // DONT FIXME: DO NOT ORDER ALPHABETICALLY, THIS IS ORDERED BY IMPORTANCE/CATEGORY! :)
-#if defined(__SYMBIAN32__) || defined(__GP32__) || defined(ANDROID) || defined(__DS__)
+#if defined(__SYMBIAN32__) || defined(__GP32__) || defined(ANDROID) || defined(__DS__) || defined(__3DS__)
 static const char HELP_STRING[] = "NoUsageString"; // save more data segment space
 #else
 static const char HELP_STRING[] =
@@ -67,7 +68,17 @@ static const char HELP_STRING[] =
 	"  -h, --help               Display a brief help text and exit\n"
 	"  -z, --list-games         Display list of supported games and exit\n"
 	"  -t, --list-targets       Display list of configured targets and exit\n"
-	"  --list-saves=TARGET      Display a list of savegames for the game (TARGET) specified\n"
+	"  --list-saves=TARGET      Display a list of saved games for the game (TARGET) specified\n"
+	"  -a, --add                Add a game from current or specified directory\n"
+	"                           Use --path=PATH before -a, --add to specify a directory.\n"
+	"  --massadd                Add all games from current or specified directory and all sub directories\n"
+	"                           Use --path=PATH before --massadd to specify a directory.\n"
+	"  --detect                 Display a list of games from current or specified directory\n"
+	"                           without adding it to the config. Use --path=PATH before --detect\n"
+	"                           to specify a directory.\n"
+	"  --auto-detect            Display a list of games from current or specified directory\n"
+	"                           and start the first one. Use --path=PATH before --auto-detect\n"
+	"                           to specify a directory.\n"
 #if defined(WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
 	"  --console                Enable the console window (default:enabled)\n"
 #endif
@@ -80,6 +91,8 @@ static const char HELP_STRING[] =
 	"  -g, --gfx-mode=MODE      Select graphics scaler (1x,2x,3x,2xsai,super2xsai,\n"
 	"                           supereagle,advmame2x,advmame3x,hq2x,hq3x,tv2x,\n"
 	"                           dotmatrix)\n"
+	"  --filtering              Force filtered graphics mode\n"
+	"  --no-filtering           Force unfiltered graphics mode\n"
 	"  --gui-theme=THEME        Select GUI theme\n"
 	"  --themepath=PATH         Path to where GUI themes are stored\n"
 	"  --list-themes            Display list of all usable GUI themes\n"
@@ -97,16 +110,18 @@ static const char HELP_STRING[] =
 	"  -d, --debuglevel=NUM     Set debug verbosity level\n"
 	"  --debugflags=FLAGS       Enable engine specific debug flags\n"
 	"                           (separated by commas)\n"
+	"  --debug-channels-only    Show only the specified debug channels\n"
 	"  -u, --dump-scripts       Enable script dumping if a directory called 'dumps'\n"
 	"                           exists in the current directory\n"
 	"\n"
-	"  --cdrom=NUM              CD drive to play CD audio from (default: 0 = first\n"
-	"                           drive)\n"
+	"  --cdrom=DRIVE            CD drive to play CD audio from; can either be a\n"
+	"                           drive, path, or numeric index (default: 0 = best\n"
+	"                           choice drive)\n"
 	"  --joystick[=NUM]         Enable joystick input (default: 0 = first joystick)\n"
 	"  --platform=WORD          Specify platform of game (allowed values: 2gs, 3do,\n"
 	"                           acorn, amiga, atari, c64, fmtowns, nes, mac, pc, pc98,\n"
 	"                           pce, segacd, wii, windows)\n"
-	"  --savepath=PATH          Path to where savegames are stored\n"
+	"  --savepath=PATH          Path to where saved games are stored\n"
 	"  --extrapath=PATH         Extra path to additional game data\n"
 	"  --soundfont=FILE         Select the SoundFont for MIDI playback (only\n"
 	"                           supported by some MIDI drivers)\n"
@@ -116,8 +131,16 @@ static const char HELP_STRING[] =
 	"  --output-rate=RATE       Select output sample rate in Hz (e.g. 22050)\n"
 	"  --opl-driver=DRIVER      Select AdLib (OPL) emulator (db, mame)\n"
 	"  --aspect-ratio           Enable aspect ratio correction\n"
-	"  --render-mode=MODE       Enable additional render modes (cga, ega, hercGreen,\n"
-	"                           hercAmber, amiga)\n"
+	"  --render-mode=MODE       Enable additional render modes (hercGreen, hercAmber,\n"
+	"                           cga, ega, vga, amiga, fmtowns, pc9821, pc9801, 2gs,\n"
+	"                           atari, macintosh)\n"
+#ifdef ENABLE_EVENTRECORDER
+	"  --record-mode=MODE       Specify record mode for event recorder (record, playback,\n"
+	"                           passthrough [default])\n"
+	"  --record-file-name=FILE  Specify record file name\n"
+	"  --disable-display        Disable any gfx output. Used for headless events\n"
+	"                           playback by Event Recorder\n"
+#endif
 	"\n"
 #if defined(ENABLE_SKY) || defined(ENABLE_QUEEN)
 	"  --alt-intro              Use alternative intro for CD versions of Beneath a\n"
@@ -128,6 +151,9 @@ static const char HELP_STRING[] =
 	"  --talkspeed=NUM          Set talk speed for games (default: 60)\n"
 #if defined(ENABLE_SCUMM) || defined(ENABLE_GROOVIE)
 	"  --demo-mode              Start demo mode of Maniac Mansion or The 7th Guest\n"
+#endif
+#if defined(ENABLE_DIRECTOR)
+	"  --start-movie=NAME       Start movie for Director\n"
 #endif
 #ifdef ENABLE_SCUMM
 	"  --tempo=NUM              Set music tempo (in percent, 50-200) for SCUMM games\n"
@@ -145,7 +171,7 @@ static const char HELP_STRING[] =
 
 static const char *s_appName = "scummvm";
 
-static void usage(const char *s, ...) GCC_PRINTF(1, 2);
+static void NORETURN_PRE usage(const char *s, ...) GCC_PRINTF(1, 2) NORETURN_POST;
 
 static void usage(const char *s, ...) {
 	char buf[STRINGBUFLEN];
@@ -168,6 +194,7 @@ void registerDefaults() {
 
 	// Graphics
 	ConfMan.registerDefault("fullscreen", false);
+	ConfMan.registerDefault("filtering", false);
 	ConfMan.registerDefault("aspect_ratio", false);
 	ConfMan.registerDefault("gfx_mode", "normal");
 	ConfMan.registerDefault("render_mode", "default");
@@ -198,7 +225,7 @@ void registerDefaults() {
 
 	// Game specific
 	ConfMan.registerDefault("path", "");
-	ConfMan.registerDefault("platform", Common::kPlatformPC);
+	ConfMan.registerDefault("platform", Common::kPlatformDOS);
 	ConfMan.registerDefault("language", "en");
 	ConfMan.registerDefault("subtitles", false);
 	ConfMan.registerDefault("boot_param", 0);
@@ -232,11 +259,34 @@ void registerDefaults() {
 	ConfMan.registerDefault("confirm_exit", false);
 	ConfMan.registerDefault("disable_sdl_parachute", false);
 
+	ConfMan.registerDefault("disable_display", false);
 	ConfMan.registerDefault("record_mode", "none");
 	ConfMan.registerDefault("record_file_name", "record.bin");
-	ConfMan.registerDefault("record_temp_file_name", "record.tmp");
-	ConfMan.registerDefault("record_time_file_name", "record.time");
 
+	ConfMan.registerDefault("gui_saveload_chooser", "grid");
+	ConfMan.registerDefault("gui_saveload_last_pos", "0");
+
+	ConfMan.registerDefault("gui_browser_show_hidden", false);
+
+#ifdef USE_FLUIDSYNTH
+	// The settings are deliberately stored the same way as in Qsynth. The
+	// FluidSynth music driver is responsible for transforming them into
+	// their appropriate values.
+	ConfMan.registerDefault("fluidsynth_chorus_activate", true);
+	ConfMan.registerDefault("fluidsynth_chorus_nr", 3);
+	ConfMan.registerDefault("fluidsynth_chorus_level", 100);
+	ConfMan.registerDefault("fluidsynth_chorus_speed", 30);
+	ConfMan.registerDefault("fluidsynth_chorus_depth", 80);
+	ConfMan.registerDefault("fluidsynth_chorus_waveform", "sine");
+
+	ConfMan.registerDefault("fluidsynth_reverb_activate", true);
+	ConfMan.registerDefault("fluidsynth_reverb_roomsize", 20);
+	ConfMan.registerDefault("fluidsynth_reverb_damping", 0);
+	ConfMan.registerDefault("fluidsynth_reverb_width", 1);
+	ConfMan.registerDefault("fluidsynth_reverb_level", 90);
+
+	ConfMan.registerDefault("fluidsynth_misc_interpolation", "4th");
+#endif
 }
 
 //
@@ -308,12 +358,19 @@ void registerDefaults() {
 		continue; \
 	}
 
+// End an option handler
+#define END_COMMAND \
+	}
+
 
 Common::String parseCommandLine(Common::StringMap &settings, int argc, const char * const *argv) {
 	const char *s, *s2;
 
+	if (!argv)
+		return Common::String();
+
 	// argv[0] contains the name of the executable.
-	if (argv && argv[0]) {
+	if (argv[0]) {
 		s = strrchr(argv[0], '/');
 		s_appName = s ? (s+1) : argv[0];
 	}
@@ -335,36 +392,60 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			// We defer checking whether this is a valid target to a later point.
 			return s;
 		} else {
+			// On MacOS X prior to 10.9 the OS is sometimes adding a -psn_X_XXXXXX argument (where X are digits)
+			// to pass the process serial number. We need to ignore it to avoid an error.
+			// When using XCode it also adds -NSDocumentRevisionsDebugMode YES argument if XCode option
+			// "Allow debugging when using document Versions Browser" is on (which is the default).
+#ifdef MACOSX
+			if (strncmp(s, "-psn_", 5) == 0)
+				continue;
+			if (strcmp(s, "-NSDocumentRevisionsDebugMode") == 0) {
+				++i; // Also skip the YES that follows
+				continue;
+			}
+#endif
 
 			bool isLongCmd = (s[0] == '-' && s[1] == '-');
 
 			DO_COMMAND('h', "help")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('v', "version")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('t', "list-targets")
-			END_OPTION
+			END_COMMAND
 
 			DO_COMMAND('z', "list-games")
-			END_OPTION
+			END_COMMAND
+
+			DO_COMMAND('a', "add")
+			END_COMMAND
+
+			DO_LONG_COMMAND("massadd")
+			END_COMMAND
+
+			DO_LONG_COMMAND("detect")
+			END_COMMAND
+
+			DO_LONG_COMMAND("auto-detect")
+			END_COMMAND
 
 #ifdef DETECTOR_TESTING_HACK
 			// HACK FIXME TODO: This command is intentionally *not* documented!
 			DO_LONG_COMMAND("test-detector")
-			END_OPTION
+			END_COMMAND
 #endif
 
 #ifdef UPGRADE_ALL_TARGETS_HACK
 			// HACK FIXME TODO: This command is intentionally *not* documented!
 			DO_LONG_COMMAND("upgrade-targets")
-			END_OPTION
+			END_COMMAND
 #endif
 
 			DO_LONG_OPTION("list-saves")
 				// FIXME: Need to document this.
-				// TODO: Make the argument optional. If no argument is given, list all savegames
+				// TODO: Make the argument optional. If no argument is given, list all saved games
 				// for all configured targets.
 				return "list-saves";
 			END_OPTION
@@ -381,17 +462,34 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION("debugflags")
 			END_OPTION
 
+			DO_LONG_OPTION_BOOL("debug-channels-only")
+			END_OPTION
+
 			DO_OPTION('e', "music-driver")
 			END_OPTION
 
 			DO_LONG_COMMAND("list-audio-devices")
-			END_OPTION
+			END_COMMAND
 
 			DO_LONG_OPTION_INT("output-rate")
 			END_OPTION
 
 			DO_OPTION_BOOL('f', "fullscreen")
 			END_OPTION
+
+			DO_LONG_OPTION_BOOL("filtering")
+			END_OPTION
+
+#ifdef ENABLE_EVENTRECORDER
+			DO_LONG_OPTION_INT("disable-display")
+			END_OPTION
+
+			DO_LONG_OPTION("record-mode")
+			END_OPTION
+
+			DO_LONG_OPTION("record-file-name")
+			END_OPTION
+#endif
 
 			DO_LONG_OPTION("opl-driver")
 			END_OPTION
@@ -481,9 +579,9 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			DO_LONG_OPTION("savepath")
 				Common::FSNode path(option);
 				if (!path.exists()) {
-					usage("Non-existent savegames path '%s'", option);
+					usage("Non-existent saved games path '%s'", option);
 				} else if (!path.isWritable()) {
-					usage("Non-writable savegames path '%s'", option);
+					usage("Non-writable saved games path '%s'", option);
 				}
 			END_OPTION
 
@@ -515,7 +613,7 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 
 			DO_LONG_COMMAND("list-themes")
-			END_OPTION
+			END_COMMAND
 
 			DO_LONG_OPTION("target-md5")
 			END_OPTION
@@ -538,18 +636,6 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 			END_OPTION
 #endif
 
-			DO_LONG_OPTION("record-mode")
-			END_OPTION
-
-			DO_LONG_OPTION("record-file-name")
-			END_OPTION
-
-			DO_LONG_OPTION("record-temp-file-name")
-			END_OPTION
-
-			DO_LONG_OPTION("record-time-file-name")
-			END_OPTION
-
 #ifdef IPHONE
 			// This is automatically set when launched from the Springboard.
 			DO_LONG_OPTION_OPT("launchedFromSB", 0)
@@ -559,6 +645,11 @@ Common::String parseCommandLine(Common::StringMap &settings, int argc, const cha
 #if defined(WIN32) && !defined(_WIN32_WCE) && !defined(__SYMBIAN32__)
 			// Optional console window on Windows (default: enabled)
 			DO_LONG_OPTION_BOOL("console")
+			END_OPTION
+#endif
+
+#if defined(ENABLE_DIRECTOR)
+			DO_LONG_OPTION("start-movie")
 			END_OPTION
 #endif
 
@@ -577,8 +668,7 @@ static void listGames() {
 	       "-------------------- ------------------------------------------------------\n");
 
 	const EnginePlugin::List &plugins = EngineMan.getPlugins();
-	EnginePlugin::List::const_iterator iter = plugins.begin();
-	for (iter = plugins.begin(); iter != plugins.end(); ++iter) {
+	for (EnginePlugin::List::const_iterator iter = plugins.begin(); iter != plugins.end(); ++iter) {
 		GameList list = (**iter)->getSupportedGames();
 		for (GameList::iterator v = list.begin(); v != list.end(); ++v) {
 			printf("%-20s %s\n", v->gameid().c_str(), v->description().c_str());
@@ -658,7 +748,7 @@ static Common::Error listSaves(const char *target) {
 		return Common::Error(Common::kEnginePluginNotSupportSaves,
 						Common::String::format("target '%s', gameid '%s", target, gameid.c_str()));
 	} else {
-		// Query the plugin for a list of savegames
+		// Query the plugin for a list of saved games
 		SaveStateList saveList = (*plugin)->listSaves(target);
 
 		if (saveList.size() > 0) {
@@ -710,6 +800,169 @@ static void listAudioDevices() {
 	}
 }
 
+/** Display all games in the given directory, or current directory if empty */
+static GameList getGameList(Common::String path) {
+	if (path.empty())
+		path = ".";
+
+	//Current directory
+	Common::FSNode dir(path);
+	Common::FSList files;
+
+	//Collect all files from directory
+	if (!dir.getChildren(files, Common::FSNode::kListAll)) {
+		printf("Path %s does not exist or is not a directory.\n", path.c_str());
+		return GameList();
+	}
+
+	// detect Games
+	GameList candidates(EngineMan.detectGames(files));
+	if (candidates.empty()) {
+		printf("ScummVM could not find any game in %s\n", path.c_str());
+	} else {
+		Common::String dataPath = dir.getPath();
+		// add game data path
+		for (GameList::iterator v = candidates.begin(); v != candidates.end(); ++v) {
+			(*v)["path"] = dataPath;
+		}
+	}
+	return candidates;
+}
+
+static bool addGameToConf(const GameDescriptor &gd) {
+	Common::String domain = gd.preferredtarget();
+
+	// If game has already been added, don't add
+	if (ConfMan.hasGameDomain(domain))
+		return false;
+
+	// Add the name domain
+	ConfMan.addGameDomain(domain);
+
+	// Copy all non-empty key/value pairs into the new domain
+	for (GameDescriptor::const_iterator iter = gd.begin(); iter != gd.end(); ++iter) {
+		if (!iter->_value.empty() && iter->_key != "preferredtarget")
+			ConfMan.set(iter->_key, iter->_value, domain);
+	}
+
+	// Display added game info
+	printf("Game Added: \n  GameID:   %s\n  Name:     %s\n  Language: %s\n  Platform: %s\n",
+			gd.gameid().c_str(),
+			gd.description().c_str(),
+			Common::getLanguageDescription(gd.language()),
+			Common::getPlatformDescription(gd.platform()));
+
+	return true;
+}
+
+/** Display all games in the given directory, return ID of first detected game */
+static Common::String detectGames(Common::String path) {
+	GameList candidates = getGameList(path);
+	if (candidates.empty())
+		return Common::String();
+
+	// Print all the candidate found
+	printf("ID                   Description\n");
+	printf("-------------------- ---------------------------------------------------------\n");
+	for (GameList::iterator v = candidates.begin(); v != candidates.end(); ++v) {
+		printf("%-20s %s\n", v->gameid().c_str(), v->description().c_str());
+	}
+
+	return candidates[0].gameid();
+}
+
+/** Add one of the games in the given directory, or current directory if empty */
+static bool addGame(Common::String path) {
+	GameList candidates = getGameList(path);
+	if (candidates.empty())
+		return false;
+
+	int idx = 0;
+	// Pick one if there are several games
+	if (candidates.size() > 1) {
+		// Print game list
+		printf("Several games are detected. Please pick one game to add: \n");
+		int i = 1;
+		for (GameList::iterator v = candidates.begin(); v != candidates.end(); ++i, ++v) {
+			printf("%2i. %s : %s\n", i, v->gameid().c_str(), v->description().c_str());
+		}
+
+		// Get user input
+		if (scanf("%i", &idx) != 1) {
+			printf("Invalid index. No game added.\n");
+			return false;
+		}
+		--idx;
+		if (idx < 0 || idx >= (int)candidates.size()) {
+			printf("Invalid index. No game added.\n");
+			return false;
+		}
+	}
+
+	if (!addGameToConf(candidates[idx])) {
+		printf("This game has already been added.\n");
+		return false;
+	}
+
+	// save to disk
+	ConfMan.flushToDisk();
+	return true;
+}
+
+static bool massAddGame(Common::String path) {
+	if (path.empty())
+		path = ".";
+
+	// Current directory
+	Common::FSNode startDir(path);
+	Common::Stack<Common::FSNode> scanStack;
+	scanStack.push(startDir);
+
+	// Number of games added
+	int n = 0, ndetect = 0;
+	while (!scanStack.empty()) {
+
+		Common::FSNode dir = scanStack.pop();
+		Common::FSList files;
+		Common::String dataPath = dir.getPath();
+
+		//Collect all files from directory
+		if (!dir.getChildren(files, Common::FSNode::kListAll))
+			continue;
+
+		// Get game list and add games
+		GameList candidates(EngineMan.detectGames(files));
+		if (!candidates.empty()) {
+			for (GameList::iterator v = candidates.begin(); v != candidates.end(); ++v) {
+				++ndetect;
+				(*v)["path"] = dataPath;
+				if (addGameToConf(*v)) {
+					++n;
+				}
+			}
+		}
+
+		// Recurse into all subdirs
+		for (Common::FSList::const_iterator file = files.begin(); file != files.end(); ++file) {
+			if (file->isDirectory()) {
+				scanStack.push(*file);
+			}
+		}
+	}
+
+	// Return and print info
+	if (n > 0) {
+		// save to disk
+		ConfMan.flushToDisk();
+		return true;
+	} else if (ndetect == 0){
+		printf("ScummVM could not find any game in %s and its sub directories\n", path.c_str());
+		return false;
+	} else {
+		printf("All games in %s and its sub directories have already been added\n", path.c_str());
+		return false;
+	}
+}
 
 #ifdef DETECTOR_TESTING_HACK
 static void runDetectorTest() {
@@ -792,9 +1045,8 @@ void upgradeTargets() {
 
 	printf("Upgrading all your existing targets\n");
 
-	Common::ConfigManager::DomainMap &domains = ConfMan.getGameDomains();
-	Common::ConfigManager::DomainMap::iterator iter = domains.begin();
-	for (iter = domains.begin(); iter != domains.end(); ++iter) {
+	Common::ConfigManager::DomainMap::iterator iter = ConfMan.beginGameDomains();
+	for (; iter != ConfMan.endGameDomains(); ++iter) {
 		Common::ConfigManager::Domain &dom = iter->_value;
 		Common::String name(iter->_key);
 		Common::String gameid(dom.getVal("gameid"));
@@ -936,6 +1188,23 @@ bool processSettings(Common::String &command, Common::StringMap &settings, Commo
 		return true;
 	} else if (command == "help") {
 		printf(HELP_STRING, s_appName);
+		return true;
+	} else if (command == "auto-detect") {
+		// If auto-detects fails (returns an empty ID) return true to close ScummVM.
+		// If we get a non-empty ID, we store it in command so that it gets processed together with the
+		// other command line options below.
+		command = detectGames(settings["path"]);
+		if (command.empty())
+			return true;
+	} else if (command == "detect") {
+		// Ignore the return value of detectGame.
+		detectGames(settings["path"]);
+		return true;
+	} else if (command == "add") {
+		addGame(settings["path"]);
+		return true;
+	} else if (command == "massadd") {
+		massAddGame(settings["path"]);
 		return true;
 	}
 #ifdef DETECTOR_TESTING_HACK

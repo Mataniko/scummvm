@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -1299,14 +1299,14 @@ static void SetOffWithinNodePath(PMOVER pMover, HPOLYGON StartPath, HPOLYGON Des
  */
 void SSetActorDest(PMOVER pActor) {
 	if (pActor->UtargetX != -1 && pActor->UtargetY != -1) {
-		Stand(nullContext, pActor->actorID, pActor->objX, pActor->objY, 0);
+		Stand(Common::nullContext, pActor->actorID, pActor->objX, pActor->objY, 0);
 
 		if (pActor->UtargetX != -1 && pActor->UtargetY != -1) {
 			SetActorDest(pActor, pActor->UtargetX, pActor->UtargetY,
 					pActor->bIgPath, 0);
 		}
 	} else {
-		Stand(nullContext, pActor->actorID, pActor->objX, pActor->objY, 0);
+		Stand(Common::nullContext, pActor->actorID, pActor->objX, pActor->objY, 0);
 	}
 }
 

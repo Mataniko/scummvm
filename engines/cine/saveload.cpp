@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -543,6 +543,15 @@ bool CineEngine::loadTempSaveOS(Common::SeekableReadStream &in) {
 			loadRel(currentRelName);
 		}
 
+		// Reset background music in CD version of Future Wars
+		if (getGameType() == GType_FW && (getFeatures() & GF_CD)) {
+			if (strlen(bgNames[0])) {
+				char buffer[20];
+				removeExtention(buffer, bgNames[0]);
+				g_sound->setBgMusic(atoi(buffer + 1));
+			}
+		}
+
 		// Load first background (Uses loadBg)
 		if (strlen(bgNames[0])) {
 			loadBg(bgNames[0]);
@@ -682,6 +691,11 @@ bool CineEngine::loadPlainSaveFW(Common::SeekableReadStream &in, CineSaveGameFor
 	}
 
 	if (strlen(bgName)) {
+		if (g_cine->getGameType() == GType_FW && (g_cine->getFeatures() & GF_CD)) {
+			char buffer[20];
+			removeExtention(buffer, bgName);
+			g_sound->setBgMusic(atoi(buffer + 1));
+		}
 		loadBg(bgName);
 	}
 
@@ -960,7 +974,7 @@ void CineEngine::makeSaveOS(Common::OutSaveFile &out) {
 	saveBgIncrustList(out);
 }
 
-void CineEngine::makeSave(char *saveFileName) {
+void CineEngine::makeSave(const Common::String &saveFileName) {
 	Common::SharedPtr<Common::OutSaveFile> fHandle(_saveFileMan->openForSaving(saveFileName));
 
 	setMouseCursor(MOUSE_CURSOR_DISK);
@@ -991,7 +1005,7 @@ void CineEngine::makeSave(char *saveFileName) {
  * at a time.
  */
 void loadResourcesFromSave(Common::SeekableReadStream &fHandle, enum CineSaveGameFormat saveGameFormat) {
-	int16 currentAnim, foundFileIdx;
+	int16 foundFileIdx;
 	char *animName, part[256], name[10];
 
 	strcpy(part, currentPartName);
@@ -1001,10 +1015,10 @@ void loadResourcesFromSave(Common::SeekableReadStream &fHandle, enum CineSaveGam
 
 	const int entrySize = ((saveGameFormat == ANIMSIZE_23) ? 23 : 30);
 	const int fileStartPos = fHandle.pos();
-	currentAnim = 0;
-	while (currentAnim < NUM_MAX_ANIMDATA) {
+
+	for (int resourceIndex = 0; resourceIndex < NUM_MAX_ANIMDATA; resourceIndex++) {
 		// Seek to the start of the current animation's entry
-		fHandle.seek(fileStartPos + currentAnim * entrySize);
+		fHandle.seek(fileStartPos + resourceIndex * entrySize);
 		// Read in the current animation entry
 		fHandle.readUint16BE(); // width
 		fHandle.readUint16BE();
@@ -1019,7 +1033,7 @@ void loadResourcesFromSave(Common::SeekableReadStream &fHandle, enum CineSaveGam
 		}
 
 		foundFileIdx = fHandle.readSint16BE();
-		fHandle.readSint16BE(); // frame
+		int16 frameIndex = fHandle.readSint16BE(); // frame
 		fHandle.read(name, 10);
 
 		// Handle variables only present in animation entries of size 23
@@ -1029,7 +1043,7 @@ void loadResourcesFromSave(Common::SeekableReadStream &fHandle, enum CineSaveGam
 
 		// Don't try to load invalid entries.
 		if (foundFileIdx < 0 || !validPtr) {
-			currentAnim++; // Jump over the invalid entry
+			//resourceIndex++; // Jump over the invalid entry
 			continue;
 		}
 
@@ -1041,9 +1055,7 @@ void loadResourcesFromSave(Common::SeekableReadStream &fHandle, enum CineSaveGam
 
 		animName = g_cine->_partBuffer[foundFileIdx].partName;
 		loadRelatedPalette(animName); // Is this for Future Wars only?
-		const int16 prevAnim = currentAnim;
-		currentAnim = loadResource(animName, currentAnim);
-		assert(currentAnim > prevAnim); // Make sure we advance forward
+		loadResource(animName, resourceIndex, frameIndex);
 	}
 
 	loadPart(part);

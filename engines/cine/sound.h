@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -24,6 +24,7 @@
 #define CINE_SOUND_H_
 
 #include "common/util.h"
+#include "common/mutex.h"
 #include "audio/mixer.h"
 
 namespace Audio {
@@ -47,7 +48,7 @@ public:
 
 	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat) = 0;
 	virtual void stopSound(int channel) = 0;
-	virtual void update() {}
+	virtual void setBgMusic(int num) = 0;
 
 protected:
 
@@ -71,11 +72,14 @@ public:
 
 	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat);
 	virtual void stopSound(int channel);
+	virtual void setBgMusic(int num);
 
 protected:
 
 	PCSoundDriver *_soundDriver;
 	PCSoundFxPlayer *_player;
+
+	uint8 _currentMusic, _currentMusicStatus, _currentBgSlot;
 };
 
 class PaulaSound : public Sound {
@@ -91,19 +95,40 @@ public:
 
 	virtual void playSound(int channel, int frequency, const uint8 *data, int size, int volumeStep, int stepCount, int volume, int repeat);
 	virtual void stopSound(int channel);
-	virtual void update();
+	virtual void setBgMusic(int num);
 
 	enum {
-		PAULA_FREQ = 7093789,
-		NUM_CHANNELS = 4,
-		SPL_HDR_SIZE = 22
+		PAULA_FREQ = 3579545,
+		NUM_CHANNELS = 4
 	};
 
 protected:
 
-	void playSoundChannel(int channel, int frequency, uint8 *data, int size, int volume);
+	struct SfxChannel {
+		Audio::SoundHandle handle;
+		int volume;
+		int volumeStep;
+		int curStep;
+		int stepCount;
 
-	Audio::SoundHandle _channelsTable[NUM_CHANNELS];
+		void initialize(int vol, int volStep, int stepCnt) {
+			volume     = vol;
+			volumeStep = volStep;
+			curStep    = stepCount = stepCnt;
+		}
+	};
+	SfxChannel _channelsTable[NUM_CHANNELS];
+	static const int _channelBalance[NUM_CHANNELS];
+	Common::Mutex _sfxMutex;
+	int _sfxTimer;
+	static void sfxTimerProc(void *param);
+	void sfxTimerCallback();
+
+	Common::Mutex _musicMutex;
+	int _musicTimer;
+	int _musicFadeTimer;
+	static void musicTimerProc(void *param);
+	void musicTimerCallback();
 	Audio::SoundHandle _moduleHandle;
 	Audio::AudioStream *_moduleStream;
 };

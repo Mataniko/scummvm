@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,7 +32,8 @@ namespace Gob {
 #define RENDERFLAG_COLLISIONS        0x0004
 #define RENDERFLAG_CAPTUREPOP        0x0008
 #define RENDERFLAG_USEDELTAS         0x0010
-#define RENDERFLAG_UNKNOWN           0x0080
+#define RENDERFLAG_BORDERHOTSPOTS    0x0040
+#define RENDERFLAG_HASWINDOWS        0x0080
 #define RENDERFLAG_NOBLITINVALIDATED 0x0200
 #define RENDERFLAG_NOSUBTITLES       0x0400
 #define RENDERFLAG_FROMSPLIT         0x0800
@@ -114,7 +115,6 @@ public:
 	int16 _unusedPalette1[18];
 	int16 _unusedPalette2[16];
 	Video::Color _vgaPalette[256];
-	Video::Color _vgaSmallPalette[16];
 
 	// 0 (00b): No cursor
 	// 1 (01b): Cursor would be on _backSurface
@@ -144,6 +144,15 @@ public:
 	int8 _cursorAnimLow[40];
 	int8 _cursorAnimHigh[40];
 	int8 _cursorAnimDelays[40];
+
+	int32 _cursorCount;
+	bool *_doCursorPalettes;
+	byte *_cursorPalettes;
+	byte *_cursorKeyColors;
+	uint16 *_cursorPaletteStarts;
+	uint16 *_cursorPaletteCounts;
+	int32 *_cursorHotspotsX;
+	int32 *_cursorHotspotsY;
 
 	int16 _palLoadData1[4];
 	int16 _palLoadData2[4];
@@ -184,8 +193,6 @@ public:
 		adjustCoords(adjust, (int16 *)coord1, (int16 *)coord2);
 	}
 	int stringLength(const char *str, uint16 fontIndex);
-	void drawString(const char *str, int16 x, int16 y, int16 color1, int16 color2,
-			int16 transp, Surface &dest, const Font &font);
 	void printTextCentered(int16 id, int16 left, int16 top, int16 right,
 			int16 bottom, const char *str, int16 fontIndex, int16 color);
 	void oPlaytoons_sub_F_1B( uint16 id, int16 left, int16 top, int16 right, int16 bottom, char *paramStr, int16 var3, int16 var4, int16 shortId);
@@ -249,6 +256,8 @@ public:
 
 private:
 	uint8 _mayorWorkaroundStatus;
+
+	void fixLittleRedStrings();
 };
 
 class Draw_Bargon: public Draw_v2 {

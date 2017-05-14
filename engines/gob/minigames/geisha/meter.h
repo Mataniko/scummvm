@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,6 +44,8 @@ public:
 	      Direction direction);
 	~Meter();
 
+	/** Return the max value the meter is measuring. */
+	int32 getMaxValue() const;
 	/** Return the current value the meter is measuring. */
 	int32 getValue() const;
 
@@ -53,10 +55,10 @@ public:
 	/** Set the current value the meter is measuring to the max value. */
 	void setMaxValue();
 
-	/** Increase the current value the meter is measuring. */
-	void increase(int32 n = 1);
-	/** Decrease the current value the meter is measuring. */
-	void decrease(int32 n = 1);
+	/** Increase the current value the meter is measuring, returning the overflow. */
+	int32 increase(int32 n = 1);
+	/** Decrease the current value the meter is measuring, returning the underflow. */
+	int32 decrease(int32 n = 1);
 
 	/** Draw the meter onto the surface and return the affected rectangle. */
 	void draw(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom);

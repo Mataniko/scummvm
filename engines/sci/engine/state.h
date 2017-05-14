@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -34,6 +34,7 @@ class WriteStream;
 }
 
 #include "sci/sci.h"
+#include "sci/engine/file.h"
 #include "sci/engine/seg_manager.h"
 
 #include "sci/parser/vocabulary.h"
@@ -42,9 +43,12 @@ class WriteStream;
 
 namespace Sci {
 
+class FileHandle;
+class DirSeeker;
 class EventManager;
 class MessageState;
 class SoundCommandParser;
+class VirtualIndexFile;
 
 enum AbortGameState {
 	kAbortNone = 0,
@@ -53,34 +57,8 @@ enum AbortGameState {
 	kAbortQuitGame = 3
 };
 
-class DirSeeker {
-protected:
-	reg_t _outbuffer;
-	Common::StringArray _files;
-	Common::StringArray _virtualFiles;
-	Common::StringArray::const_iterator _iter;
-
-public:
-	DirSeeker() {
-		_outbuffer = NULL_REG;
-		_iter = _files.begin();
-	}
-
-	reg_t firstFile(const Common::String &mask, reg_t buffer, SegManager *segMan);
-	reg_t nextFile(SegManager *segMan);
-
-	Common::String getVirtualFilename(uint fileNumber);
-
-private:
-	void addAsVirtualFiles(Common::String title, Common::String fileMask);
-};
-
-enum {
-	MAX_SAVEGAME_NR = 20 /**< Maximum number of savegames */
-};
-
 // We assume that scripts give us savegameId 0->99 for creating a new save slot
-//  and savegameId 100->199 for existing save slots ffs. kfile.cpp
+//  and savegameId 100->199 for existing save slots. Refer to kfile.cpp
 enum {
 	SAVEGAMEID_OFFICIALRANGE_START = 100,
 	SAVEGAMEID_OFFICIALRANGE_END = 199
@@ -90,20 +68,6 @@ enum {
 	GAMEISRESTARTING_NONE = 0,
 	GAMEISRESTARTING_RESTART = 1,
 	GAMEISRESTARTING_RESTORE = 2
-};
-
-class FileHandle {
-public:
-	Common::String _name;
-	Common::SeekableReadStream *_in;
-	Common::WriteStream *_out;
-
-public:
-	FileHandle();
-	~FileHandle();
-
-	void close();
-	bool isOpen() const;
 };
 
 enum VideoFlags {
@@ -131,6 +95,21 @@ struct VideoState {
 	}
 };
 
+/**
+ * Trace information about a VM function call.
+ */
+struct SciCallOrigin {
+	int scriptNr; //< The source script of the function
+	Common::String objectName; //< The name of the object being called
+	Common::String methodName; //< The name of the method being called
+	int localCallOffset; //< The byte offset of a local script subroutine called by the origin method. -1 if not in a local subroutine.
+	int roomNr; //< The room that was loaded at the time of the call
+
+	Common::String toString() const {
+		return Common::String::format("method %s::%s (room %d, script %d, localCall %x)", objectName.c_str(), methodName.c_str(), roomNr, scriptNr, localCallOffset);
+	}
+};
+
 struct EngineState : public Common::Serializable {
 public:
 	EngineState(SegManager *segMan);
@@ -149,7 +128,9 @@ public:
 	void speedThrottler(uint32 neededSleep);
 	void wait(int16 ticks);
 
-	uint32 _throttleCounter; /**< total times kAnimate was invoked */
+#ifdef ENABLE_SCI32
+	uint32 _eventCounter; /**< total times kGetEvent was invoked since the last call to kFrameOut */
+#endif
 	uint32 _throttleLastTime; /**< last time kAnimate was invoked */
 	bool _throttleTrigger;
 	bool _gameIsBenchmarking;
@@ -163,9 +144,13 @@ public:
 	int16 _lastSaveVirtualId; // last virtual id fed to kSaveGame, if no kGetSaveFiles was called inbetween
 	int16 _lastSaveNewId;    // last newly created filename-id by kSaveGame
 
+	// see detection.cpp / SciEngine::loadGameState()
+	int _delayedRestoreGameId; // the saved game id, that it supposed to get restored (triggered by ScummVM menu)
+
 	uint _chosenQfGImportItem; // Remembers the item selected in QfG import rooms
 
-	bool _cursorWorkaroundActive; // ffs. GfxCursor::setPosition()
+	bool _cursorWorkaroundActive; // Refer to GfxCursor::setPosition()
+	int16 _cursorWorkaroundPosCount; // When the cursor is reported to be at the previously set coordinate, we won't disable the workaround unless it happened for this many times
 	Common::Point _cursorWorkaroundPoint;
 	Common::Rect _cursorWorkaroundRect;
 
@@ -227,13 +212,18 @@ public:
 	uint16 _memorySegmentSize;
 	byte _memorySegment[kMemorySegmentMax];
 
+	// TODO: Excise video code from the state manager
 	VideoState _videoState;
-	bool _syncedAudioOptions;
 
 	/**
 	 * Resets the engine state.
 	 */
 	void reset(bool isRestoring);
+
+	/**
+	 * Finds and returns the origin of the current call.
+	 */
+	SciCallOrigin getCurrentCallOrigin() const;
 };
 
 } // End of namespace Sci

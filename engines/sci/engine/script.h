@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -24,13 +24,15 @@
 #define SCI_ENGINE_SCRIPT_H
 
 #include "common/str.h"
+#include "sci/util.h"
 #include "sci/engine/segment.h"
+#include "sci/engine/script_patches.h"
 
 namespace Sci {
 
 struct EngineState;
 class ResourceManager;
-struct SciScriptSignature;
+struct SciScriptPatcherEntry;
 
 enum ScriptObjectTypes {
 	SCI_OBJ_TERMINATOR,
@@ -46,24 +48,38 @@ enum ScriptObjectTypes {
 	SCI_OBJ_LOCALVARS
 };
 
-typedef Common::HashMap<uint16, Object> ObjMap;
+typedef Common::HashMap<uint32, Object> ObjMap;
+
+enum ScriptOffsetEntryTypes {
+	SCI_SCR_OFFSET_TYPE_OBJECT = 0, // classes are handled by this type as well
+	SCI_SCR_OFFSET_TYPE_STRING,
+	SCI_SCR_OFFSET_TYPE_SAID
+};
+
+struct offsetLookupArrayEntry {
+	uint16    type;       // type of entry
+	uint16    id;         // id of this type, first item inside script data is 1, second item is 2, etc.
+	uint32    offset;     // offset of entry within script resource data
+	uint16    stringSize; // size of string, including terminating [NUL]
+};
+
+typedef Common::Array<offsetLookupArrayEntry> offsetLookupArrayType;
 
 class Script : public SegmentObj {
 private:
 	int _nr; /**< Script number */
-	byte *_buf; /**< Static data buffer, or NULL if not used */
-	byte *_heapStart; /**< Start of heap if SCI1.1, NULL otherwise */
+	Common::SpanOwner<SciSpan<byte> > _buf; /**< Static data buffer, or NULL if not used */
+	SciSpan<byte> _script; /**< Script size includes alignment byte */
+	SciSpan<byte> _heap; /**< Start of heap if SCI1.1, NULL otherwise */
 
 	int _lockers; /**< Number of classes and objects that require this script */
-	size_t _scriptSize;
-	size_t _heapSize;
-	uint16 _bufSize;
 
-	const uint16 *_exportTable; /**< Abs. offset of the export table or 0 if not present */
-	uint16 _numExports; /**< Number of entries in the exports table */
+	SciSpan<const uint16> _exports; /**< Exports block or 0 if not present */
+	uint16 _numExports; /**< Number of export entries */
+	SciSpan<const byte> _synonyms; /**< Synonyms block or 0 if not present */
+	uint16 _numSynonyms; /**< Number of synonym entries */
 
-	const byte *_synonyms; /**< Synonyms block or 0 if not present */
-	uint16 _numSynonyms; /**< Number of entries in the synonyms block */
+	int _codeOffset; /**< The absolute offset of the VM code block */
 
 	int _localsOffset;
 	uint16 _localsCount;
@@ -74,14 +90,24 @@ private:
 
 	ObjMap _objects;	/**< Table for objects, contains property variables */
 
+protected:
+	offsetLookupArrayType _offsetLookupArray; // Table of all elements of currently loaded script, that may get pointed to
+
+private:
+	uint16 _offsetLookupObjectCount;
+	uint16 _offsetLookupStringCount;
+	uint16 _offsetLookupSaidCount;
+
 public:
 	int getLocalsOffset() const { return _localsOffset; }
 	uint16 getLocalsCount() const { return _localsCount; }
 
-	uint32 getScriptSize() const { return _scriptSize; }
-	uint32 getHeapSize() const { return _heapSize; }
-	uint32 getBufSize() const { return _bufSize; }
-	const byte *getBuf(uint offset = 0) const { return _buf + offset; }
+	uint32 getScriptSize() const { return _script.size(); }
+	uint32 getHeapSize() const { return _heap.size(); }
+	uint32 getBufSize() const { return _buf->size(); }
+
+	const byte *getBuf(uint offset = 0) const { return _buf->getUnsafeDataAt(offset); }
+	SciSpan<const byte> getSpan(uint offset) const { return _buf->subspan(offset); }
 
 	int getScriptNumber() const { return _nr; }
 	SegmentId getLocalsSegment() const { return _localsSegment; }
@@ -89,20 +115,16 @@ public:
 	void syncLocalsBlock(SegManager *segMan);
 	ObjMap &getObjectMap() { return _objects; }
 	const ObjMap &getObjectMap() const { return _objects; }
+	bool offsetIsObject(uint32 offset) const;
 
 public:
 	Script();
 	~Script();
 
 	void freeScript();
-	void init(int script_nr, ResourceManager *resMan);
-	void load(ResourceManager *resMan);
+	void load(int script_nr, ResourceManager *resMan, ScriptPatcher *scriptPatcher);
 
-	void matchSignatureAndPatch(uint16 scriptNr, byte *scriptData, const uint32 scriptSize);
-	int32 findSignature(const SciScriptSignature *signature, const byte *scriptData, const uint32 scriptSize);
-	void applyPatch(const uint16 *patch, byte *scriptData, const uint32 scriptSize, int32 signatureOffset);
-
-	virtual bool isValidOffset(uint16 offset) const;
+	virtual bool isValidOffset(uint32 offset) const;
 	virtual SegmentRef dereference(reg_t pointer);
 	virtual reg_t findCanonicAddress(SegManager *segMan, reg_t sub_addr) const;
 	virtual void freeAtAddress(SegManager *segMan, reg_t sub_addr);
@@ -119,8 +141,8 @@ public:
 
 	virtual void saveLoadWithSerializer(Common::Serializer &ser);
 
-	Object *getObject(uint16 offset);
-	const Object *getObject(uint16 offset) const;
+	Object *getObject(uint32 offset);
+	const Object *getObject(uint32 offset) const;
 
 	/**
 	 * Initializes an object within the segment manager
@@ -170,10 +192,10 @@ public:
 	void setLockers(int lockers);
 
 	/**
-	 * Retrieves a pointer to the exports of this script
-	 * @return	pointer to the exports.
+	 * Retrieves the offset of the export table in the script
+	 * @return	the exports offset.
 	 */
-	const uint16 *getExportTable() const { return _exportTable; }
+	uint getExportsOffset() const { return _exports.sourceByteOffset(); }
 
 	/**
 	 * Retrieves the number of exports of script.
@@ -185,7 +207,7 @@ public:
 	 * Retrieves a pointer to the synonyms associated with this script
 	 * @return	pointer to the synonyms, in non-parsed format.
 	 */
-	const byte *getSynonyms() const { return _synonyms; }
+	const SciSpan<const byte> &getSynonyms() const { return _synonyms; }
 
 	/**
 	 * Retrieves the number of synonyms associated with this script.
@@ -197,11 +219,11 @@ public:
 	 * Validate whether the specified public function is exported by
 	 * the script in the specified segment.
 	 * @param pubfunct		Index of the function to validate
-	 * @param relocate              Decide whether to relocate this public function or not
+	 * @param relocSci3     Decide whether to relocate this SCI3 public function or not
 	 * @return				NULL if the public function is invalid, its
 	 * 						offset into the script's segment otherwise
 	 */
-	uint16 validateExportFunc(int pubfunct, bool relocate);
+	uint32 validateExportFunc(int pubfunct, bool relocSci3);
 
 	/**
 	 * Marks the script as deleted.
@@ -222,34 +244,37 @@ public:
 	}
 
 	/**
-	 * Copies a byte string into a script's heap representation.
-	 * @param dst	script-relative offset of the destination area
-	 * @param src	pointer to the data source location
-	 * @param n		number of bytes to copy
-	 */
-	void mcpyInOut(int dst, const void *src, size_t n);
-
-	/**
 	 * Finds the pointer where a block of a specific type starts from,
 	 * in SCI0 - SCI1 games
 	 */
-	byte *findBlockSCI0(int type, int startBlockIndex = -1);
+	SciSpan<const byte> findBlockSCI0(ScriptObjectTypes type, bool findLastBlock = false);
 
 	/**
 	 * Syncs the string heap of a script. Used when saving/loading.
 	 */
 	void syncStringHeap(Common::Serializer &ser);
 
+#ifdef ENABLE_SCI32
 	/**
 	 * Resolve a relocation in an SCI3 script
 	 * @param offset        The offset to relocate from
 	 */
-	int relocateOffsetSci3(uint32 offset);
+	int relocateOffsetSci3(uint32 offset) const;
+#endif
 
 	/**
-	 * Gets an offset to the beginning of the code block in a SCI3 script
+	 * Gets an offset to the beginning of the code block in a SCI1.1 or later
+	 * script
 	 */
-	int getCodeBlockOffset() { return READ_SCI11ENDIAN_UINT32(_buf); }
+	int getCodeBlockOffset() { return _codeOffset; }
+
+	/**
+	 * Get the offset array
+	 */
+	const offsetLookupArrayType *getOffsetArray() { return &_offsetLookupArray; };
+	uint16 getOffsetObjectCount() { return _offsetLookupObjectCount; };
+	uint16 getOffsetStringCount() { return _offsetLookupStringCount; };
+	uint16 getOffsetSaidCount() { return _offsetLookupSaidCount; };
 
 private:
 	/**
@@ -260,6 +285,7 @@ private:
 	 */
 	void relocateSci0Sci21(reg_t block);
 
+#ifdef ENABLE_SCI32
 	/**
 	 * Processes a relocation block within a SCI3 script
 	 *  This function is idempotent, but it must only be called after all
@@ -267,13 +293,16 @@ private:
 	 * @param obj_pos	Location (segment, offset) of the block
 	 */
 	void relocateSci3(reg_t block);
+#endif
 
 	bool relocateLocal(SegmentId segment, int location);
 
+#ifdef ENABLE_SCI32
 	/**
 	 * Gets a pointer to the beginning of the objects in a SCI3 script
 	 */
-	const byte *getSci3ObjectsPointer();
+	SciSpan<const byte> getSci3ObjectsPointer();
+#endif
 
 	/**
 	 * Initializes the script's objects (SCI0)
@@ -289,14 +318,21 @@ private:
 	 */
 	void initializeObjectsSci11(SegManager *segMan, SegmentId segmentId);
 
+#ifdef ENABLE_SCI32
 	/**
 	 * Initializes the script's objects (SCI3)
 	 * @param segMan	A reference to the segment manager
 	 * @param segmentId	The script's segment id
 	 */
 	void initializeObjectsSci3(SegManager *segMan, SegmentId segmentId);
+#endif
 
 	LocalVariables *allocLocalsSegment(SegManager *segMan);
+
+	/**
+	 * Identifies certain offsets within script data and set up lookup-table
+	 */
+	void identifyOffsets();
 };
 
 } // End of namespace Sci

@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "common/events.h"
@@ -27,6 +28,7 @@
 #include "common/rect.h"
 #include "common/textconsole.h"
 #include "common/translation.h"
+#include "gui/EventRecorder.h"
 
 #include "backends/keymapper/keymapper.h"
 
@@ -61,6 +63,8 @@ GuiManager::GuiManager() : _redrawStatus(kRedrawDisabled), _stateIsSaved(false),
 	_lastScreenChangeID = _system->getScreenChangeID();
 	_width = _system->getOverlayWidth();
 	_height = _system->getOverlayHeight();
+
+	_launched = false;
 
 	// Clear the cursor
 	memset(_cursor, 0xFF, sizeof(_cursor));
@@ -126,7 +130,7 @@ void GuiManager::initKeymap() {
 	act = new Action(guiMap, "REMP", _("Remap keys"));
 	act->addEvent(EVENT_KEYMAPPER_REMAP);
 
-	act = new Action(guiMap, "FULS", _("Toggle FullScreen"));
+	act = new Action(guiMap, "FULS", _("Toggle fullscreen"));
 	act->addKeyEvent(KeyState(KEYCODE_RETURN, ASCII_RETURN, KBD_ALT));
 
 	mapper->addGlobalKeymap(guiMap);
@@ -212,7 +216,7 @@ void GuiManager::redraw() {
 	// Tanoku: Do not apply shading more than once when opening many dialogs
 	// on top of each other. Screen ends up being too dark and it's a
 	// performance hog.
-	if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 2)
+	if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 3)
 		shading = ThemeEngine::kShadingNone;
 
 	switch (_redrawStatus) {
@@ -250,14 +254,34 @@ Dialog *GuiManager::getTopDialog() const {
 	return _dialogStack.top();
 }
 
+void GuiManager::addToTrash(GuiObject* object, Dialog* parent) {
+	debug(7, "Adding Gui Object %p to trash", (void *)object);
+	GuiObjectTrashItem t;
+	t.object = object;
+	t.parent = 0;
+	// If a dialog was provided, check it is in the dialog stack
+	if (parent != 0) {
+		for (uint i = 0 ; i < _dialogStack.size() ; ++i) {
+			if (_dialogStack[i] == parent) {
+				t.parent = parent;
+				break;
+			}
+		}
+	}
+	_guiObjectTrash.push_back(t);
+}
+
 void GuiManager::runLoop() {
 	Dialog * const activeDialog = getTopDialog();
 	bool didSaveState = false;
-	int button;
-	uint32 time;
 
 	if (activeDialog == 0)
 		return;
+
+#ifdef ENABLE_EVENTRECORDER
+	// Suspend recording while GUI is shown
+	g_eventRec.suspendRecording();
+#endif
 
 	if (!_stateIsSaved) {
 		saveState();
@@ -274,14 +298,9 @@ void GuiManager::runLoop() {
 		redraw();
 	}
 
-	_lastMousePosition.x = _lastMousePosition.y = -1;
-	_lastMousePosition.time = 0;
-
 	Common::EventManager *eventMan = _system->getEventManager();
 	uint32 lastRedraw = 0;
-	const uint32 waitTime = 1000 / 45;
-
-	bool tooltipCheck = false;
+	const uint32 waitTime = 1000 / 60;
 
 	while (!_dialogStack.empty() && activeDialog == getTopDialog() && !eventMan->shouldQuit()) {
 		redraw();
@@ -296,92 +315,63 @@ void GuiManager::runLoop() {
 //		_theme->updateScreen();
 //		_system->updateScreen();
 
-		if (lastRedraw + waitTime < _system->getMillis()) {
+		if (lastRedraw + waitTime < _system->getMillis(true)) {
+			lastRedraw = _system->getMillis(true);
 			_theme->updateScreen();
 			_system->updateScreen();
-			lastRedraw = _system->getMillis();
 		}
 
 		Common::Event event;
 
 		while (eventMan->pollEvent(event)) {
+			// We will need to check whether the screen changed while polling
+			// for an event here. While we do send EVENT_SCREEN_CHANGED
+			// whenever this happens we still cannot be sure that we get such
+			// an event immediately. For example, we might have an mouse move
+			// event queued before an screen changed event. In some rare cases
+			// this would make the GUI redraw (with the code a few lines
+			// below) when it is not yet updated for new overlay dimensions.
+			// As a result ScummVM would crash because it tries to copy data
+			// outside the actual overlay screen.
+			if (event.type != Common::EVENT_SCREEN_CHANGED) {
+				checkScreenChange();
+			}
+
 			// The top dialog can change during the event loop. In that case, flush all the
 			// dialog-related events since they were probably generated while the old dialog
 			// was still visible, and therefore not intended for the new one.
 			//
 			// This hopefully fixes strange behavior/crashes with pop-up widgets. (Most easily
 			// triggered in 3x mode or when running ScummVM under Valgrind.)
-			if (activeDialog != getTopDialog() && event.type != Common::EVENT_SCREEN_CHANGED)
+			if (activeDialog != getTopDialog() && event.type != Common::EVENT_SCREEN_CHANGED) {
+				processEvent(event, getTopDialog());
 				continue;
-
-			Common::Point mouse(event.mouse.x - activeDialog->_x, event.mouse.y - activeDialog->_y);
-
-			switch (event.type) {
-			case Common::EVENT_KEYDOWN:
-				activeDialog->handleKeyDown(event.kbd);
-				break;
-			case Common::EVENT_KEYUP:
-				activeDialog->handleKeyUp(event.kbd);
-				break;
-			case Common::EVENT_MOUSEMOVE:
-				activeDialog->handleMouseMoved(mouse.x, mouse.y, 0);
-
-				if (mouse.x != _lastMousePosition.x || mouse.y != _lastMousePosition.y) {
-					_lastMousePosition.x = mouse.x;
-					_lastMousePosition.y = mouse.y;
-					_lastMousePosition.time = _system->getMillis();
-				}
-
-				tooltipCheck = true;
-				break;
-			// We don't distinguish between mousebuttons (for now at least)
-			case Common::EVENT_LBUTTONDOWN:
-			case Common::EVENT_RBUTTONDOWN:
-				button = (event.type == Common::EVENT_LBUTTONDOWN ? 1 : 2);
-				time = _system->getMillis();
-				if (_lastClick.count && (time < _lastClick.time + kDoubleClickDelay)
-							&& ABS(_lastClick.x - event.mouse.x) < 3
-							&& ABS(_lastClick.y - event.mouse.y) < 3) {
-					_lastClick.count++;
-				} else {
-					_lastClick.x = event.mouse.x;
-					_lastClick.y = event.mouse.y;
-					_lastClick.count = 1;
-				}
-				_lastClick.time = time;
-				activeDialog->handleMouseDown(mouse.x, mouse.y, button, _lastClick.count);
-				break;
-			case Common::EVENT_LBUTTONUP:
-			case Common::EVENT_RBUTTONUP:
-				button = (event.type == Common::EVENT_LBUTTONUP ? 1 : 2);
-				activeDialog->handleMouseUp(mouse.x, mouse.y, button, _lastClick.count);
-				break;
-			case Common::EVENT_WHEELUP:
-				activeDialog->handleMouseWheel(mouse.x, mouse.y, -1);
-				break;
-			case Common::EVENT_WHEELDOWN:
-				activeDialog->handleMouseWheel(mouse.x, mouse.y, 1);
-				break;
-			case Common::EVENT_SCREEN_CHANGED:
-				screenChange();
-				break;
-			default:
-#ifdef ENABLE_KEYMAPPER
-				activeDialog->handleOtherEvent(event);
-#endif
-				break;
 			}
 
-			if (lastRedraw + waitTime < _system->getMillis()) {
+			processEvent(event, activeDialog);
+
+
+			if (lastRedraw + waitTime < _system->getMillis(true)) {
+				lastRedraw = _system->getMillis(true);
 				_theme->updateScreen();
 				_system->updateScreen();
-				lastRedraw = _system->getMillis();
 			}
 		}
 
-		if (tooltipCheck && _lastMousePosition.time + kTooltipDelay < _system->getMillis()) {
+		// Delete GuiObject that have been added to the trash for a delayed deletion
+		Common::List<GuiObjectTrashItem>::iterator it = _guiObjectTrash.begin();
+		while (it != _guiObjectTrash.end()) {
+			if ((*it).parent == 0 || (*it).parent == activeDialog) {
+				debug(7, "Delayed deletion of Gui Object %p", (void *)(*it).object);
+				delete (*it).object;
+				it = _guiObjectTrash.erase(it);
+			} else
+				++it;
+		}
+
+		if (_lastMousePosition.time + kTooltipDelay < _system->getMillis(true)) {
 			Widget *wdg = activeDialog->findWidget(_lastMousePosition.x, _lastMousePosition.y);
-			if (wdg && wdg->getTooltip()) {
+			if (wdg && wdg->hasTooltip() && !(wdg->getFlags() & WIDGET_PRESSED)) {
 				Tooltip *tooltip = new Tooltip();
 				tooltip->setup(activeDialog, wdg, _lastMousePosition.x, _lastMousePosition.y);
 				tooltip->runModal();
@@ -409,6 +399,11 @@ void GuiManager::runLoop() {
 		restoreState();
 		_useStdCursor = false;
 	}
+
+#ifdef ENABLE_EVENTRECORDER
+	// Resume recording once GUI is shown
+	g_eventRec.resumeRecording();
+#endif
 }
 
 #pragma mark -
@@ -441,6 +436,11 @@ void GuiManager::restoreState() {
 }
 
 void GuiManager::openDialog(Dialog *dialog) {
+	giveFocusToDialog(dialog);
+
+	if (!_dialogStack.empty())
+		getTopDialog()->lostFocus();
+
 	_dialogStack.push(dialog);
 	if (_redrawStatus != kRedrawFull)
 		_redrawStatus = kRedrawOpenDialog;
@@ -458,7 +458,13 @@ void GuiManager::closeTopDialog() {
 		return;
 
 	// Remove the dialog from the stack
-	_dialogStack.pop();
+	_dialogStack.pop()->lostFocus();
+
+	if (!_dialogStack.empty()) {
+		Dialog *dialog = getTopDialog();
+		giveFocusToDialog(dialog);
+	}
+
 	if (_redrawStatus != kRedrawFull)
 		_redrawStatus = kRedrawCloseDialog;
 
@@ -483,7 +489,7 @@ void GuiManager::setupCursor() {
 // very much. We could plug in a different cursor here if we like to.
 
 void GuiManager::animateCursor() {
-	int time = _system->getMillis();
+	int time = _system->getMillis(true);
 	if (time > _cursorAnimateTimer + kCursorAnimateDelay) {
 		for (int i = 0; i < 15; i++) {
 			if ((i < 6) || (i > 8)) {
@@ -526,6 +532,88 @@ void GuiManager::screenChange() {
 	_redrawStatus = kRedrawFull;
 	redraw();
 	_system->updateScreen();
+}
+
+void GuiManager::processEvent(const Common::Event &event, Dialog *const activeDialog) {
+	if (activeDialog == 0)
+		return;
+	int button;
+	uint32 time;
+	Common::Point mouse(event.mouse.x - activeDialog->_x, event.mouse.y - activeDialog->_y);
+
+	switch (event.type) {
+	case Common::EVENT_KEYDOWN:
+		activeDialog->handleKeyDown(event.kbd);
+		break;
+	case Common::EVENT_KEYUP:
+		activeDialog->handleKeyUp(event.kbd);
+		break;
+	case Common::EVENT_MOUSEMOVE:
+		_globalMousePosition.x = event.mouse.x;
+		_globalMousePosition.y = event.mouse.y;
+		activeDialog->handleMouseMoved(mouse.x, mouse.y, 0);
+
+		if (mouse.x != _lastMousePosition.x || mouse.y != _lastMousePosition.y) {
+			setLastMousePos(mouse.x, mouse.y);
+		}
+
+		break;
+		// We don't distinguish between mousebuttons (for now at least)
+	case Common::EVENT_LBUTTONDOWN:
+	case Common::EVENT_RBUTTONDOWN:
+		button = (event.type == Common::EVENT_LBUTTONDOWN ? 1 : 2);
+		time = _system->getMillis(true);
+		if (_lastClick.count && (time < _lastClick.time + kDoubleClickDelay)
+			&& ABS(_lastClick.x - event.mouse.x) < 3
+			&& ABS(_lastClick.y - event.mouse.y) < 3) {
+				_lastClick.count++;
+		} else {
+			_lastClick.x = event.mouse.x;
+			_lastClick.y = event.mouse.y;
+			_lastClick.count = 1;
+		}
+		_lastClick.time = time;
+		activeDialog->handleMouseDown(mouse.x, mouse.y, button, _lastClick.count);
+		break;
+	case Common::EVENT_LBUTTONUP:
+	case Common::EVENT_RBUTTONUP:
+		button = (event.type == Common::EVENT_LBUTTONUP ? 1 : 2);
+		activeDialog->handleMouseUp(mouse.x, mouse.y, button, _lastClick.count);
+		break;
+	case Common::EVENT_WHEELUP:
+		activeDialog->handleMouseWheel(mouse.x, mouse.y, -1);
+		break;
+	case Common::EVENT_WHEELDOWN:
+		activeDialog->handleMouseWheel(mouse.x, mouse.y, 1);
+		break;
+	case Common::EVENT_SCREEN_CHANGED:
+		screenChange();
+		break;
+	default:
+	#ifdef ENABLE_KEYMAPPER
+		activeDialog->handleOtherEvent(event);
+	#endif
+		break;
+	}
+}
+
+void GuiManager::doFullRedraw() {
+	_redrawStatus = kRedrawFull;
+	redraw();
+	_system->updateScreen();
+}
+
+void GuiManager::giveFocusToDialog(Dialog *dialog) {
+	int16 dialogX = _globalMousePosition.x - dialog->_x;
+	int16 dialogY = _globalMousePosition.y - dialog->_y;
+	dialog->receivedFocus(dialogX, dialogY);
+	setLastMousePos(dialogX, dialogY);
+}
+
+void GuiManager::setLastMousePos(int16 x, int16 y) {
+	_lastMousePosition.x = x;
+	_lastMousePosition.y = y;
+	_lastMousePosition.time = _system->getMillis(true);
 }
 
 } // End of namespace GUI

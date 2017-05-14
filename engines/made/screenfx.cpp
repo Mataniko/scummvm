@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -52,6 +52,11 @@ ScreenEffects::ScreenEffects(Screen *screen) : _screen(screen) {
 
 	_fxPalette = new byte[768];
 
+	_blendedPaletteStatus._active = false;
+	_blendedPaletteStatus._palette = _blendedPaletteStatus._newPalette = nullptr;
+	_blendedPaletteStatus._colorCount = 0;
+	_blendedPaletteStatus._value = _blendedPaletteStatus._maxValue = 0;
+	_blendedPaletteStatus._incr = 0;
 }
 
 ScreenEffects::~ScreenEffects() {
@@ -165,7 +170,7 @@ void ScreenEffects::flash(int flashCount, byte *palette, int colorCount) {
 		_screen->setRGBPalette(_fxPalette, 0, colorCount);
 		_screen->updateScreenAndWait(20);
 		_screen->setRGBPalette(palette, 0, colorCount);
- 		_screen->updateScreenAndWait(20);
+		_screen->updateScreenAndWait(20);
 	}
 }
 
@@ -196,14 +201,14 @@ void ScreenEffects::startBlendedPalette(byte *palette, byte *newPalette, int col
 }
 
 void ScreenEffects::stepBlendedPalette() {
-	if (_blendedPaletteStatus._active && _blendedPaletteStatus._value < _blendedPaletteStatus._maxValue) {
+	if (_blendedPaletteStatus._active && _blendedPaletteStatus._value <= _blendedPaletteStatus._maxValue) {
 		setBlendedPalette(_blendedPaletteStatus._palette, _blendedPaletteStatus._newPalette,
 			_blendedPaletteStatus._colorCount, _blendedPaletteStatus._value, _blendedPaletteStatus._maxValue);
 		if (_blendedPaletteStatus._value == _blendedPaletteStatus._maxValue)
-			_blendedPaletteStatus._value++;	
-		else					
-			_blendedPaletteStatus._value = MIN<int16>(_blendedPaletteStatus._value + _blendedPaletteStatus._incr, _blendedPaletteStatus._maxValue);	
-	}		
+			_blendedPaletteStatus._value++;
+		else
+			_blendedPaletteStatus._value = MIN<int16>(_blendedPaletteStatus._value + _blendedPaletteStatus._incr, _blendedPaletteStatus._maxValue);
+	}
 }
 
 void ScreenEffects::copyFxRect(Graphics::Surface *surface, int16 x1, int16 y1, int16 x2, int16 y2) {
@@ -293,7 +298,7 @@ void ScreenEffects::vfx00(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx01(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 312);
 	for (int x = 0; x < 320; x += 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(x, 0), surface->pitch, x, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(x, 0), surface->pitch, x, 0, 8, 200);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -303,7 +308,7 @@ void ScreenEffects::vfx01(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx02(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 312);
 	for (int x = 312; x >= 0; x -= 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(x, 0), surface->pitch, x, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(x, 0), surface->pitch, x, 0, 8, 200);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -313,7 +318,7 @@ void ScreenEffects::vfx02(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx03(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 190);
 	for (int y = 0; y < 200; y += 10) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, y), surface->pitch, 0, y, 320, 10);
+		_screen->copyRectToScreen(surface->getBasePtr(0, y), surface->pitch, 0, y, 320, 10);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -323,7 +328,7 @@ void ScreenEffects::vfx03(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx04(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 190);
 	for (int y = 190; y >= 0; y -= 10) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, y), surface->pitch, 0, y, 320, 10);
+		_screen->copyRectToScreen(surface->getBasePtr(0, y), surface->pitch, 0, y, 320, 10);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -333,8 +338,8 @@ void ScreenEffects::vfx04(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx05(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 90);
 	for (int y = 0; y < 100; y += 10) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, y + 100), surface->pitch, 0, y + 100, 320, 10);
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, 90 - y), surface->pitch, 0, 90 - y, 320, 10);
+		_screen->copyRectToScreen(surface->getBasePtr(0, y + 100), surface->pitch, 0, y + 100, 320, 10);
+		_screen->copyRectToScreen(surface->getBasePtr(0, 90 - y), surface->pitch, 0, 90 - y, 320, 10);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -345,8 +350,8 @@ void ScreenEffects::vfx05(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx06(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 152);
 	for (int x = 0; x < 160; x += 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(x + 160, 0), surface->pitch, x + 160, 0, 8, 200);
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(152 - x, 0), surface->pitch, 152 - x, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(x + 160, 0), surface->pitch, x + 160, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(152 - x, 0), surface->pitch, 152 - x, 0, 8, 200);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -357,8 +362,8 @@ void ScreenEffects::vfx06(Graphics::Surface *surface, byte *palette, byte *newPa
 void ScreenEffects::vfx07(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	startBlendedPalette(palette, newPalette, colorCount, 152);
 	for (int x = 152; x >= 0; x -= 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(x + 160, 0), surface->pitch, x + 160, 0, 8, 200);
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(152 - x, 0), surface->pitch, 152 - x, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(x + 160, 0), surface->pitch, x + 160, 0, 8, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(152 - x, 0), surface->pitch, 152 - x, 0, 8, 200);
 		stepBlendedPalette();
 		_screen->updateScreenAndWait(25);
 	}
@@ -368,7 +373,7 @@ void ScreenEffects::vfx07(Graphics::Surface *surface, byte *palette, byte *newPa
 // "Screen slide in" right to left
 void ScreenEffects::vfx08(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	for (int x = 8; x <= 320; x += 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, 0), surface->pitch, 320 - x, 0, x, 200);
+		_screen->copyRectToScreen(surface->getPixels(), surface->pitch, 320 - x, 0, x, 200);
 		_screen->updateScreenAndWait(25);
 	}
 	setPalette(palette);
@@ -509,7 +514,7 @@ void ScreenEffects::vfx17(Graphics::Surface *surface, byte *palette, byte *newPa
 // "Screen slide in" left to right
 void ScreenEffects::vfx18(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	for (int x = 8; x <= 320; x += 8) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(320 - x, 0), surface->pitch, 0, 0, x, 200);
+		_screen->copyRectToScreen(surface->getBasePtr(320 - x, 0), surface->pitch, 0, 0, x, 200);
 		_screen->updateScreenAndWait(25);
 	}
 
@@ -519,7 +524,7 @@ void ScreenEffects::vfx18(Graphics::Surface *surface, byte *palette, byte *newPa
 // "Screen slide in" top to bottom
 void ScreenEffects::vfx19(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	for (int y = 4; y <= 200; y += 4) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, 200 - y), surface->pitch, 0, 0, 320, y);
+		_screen->copyRectToScreen(surface->getBasePtr(0, 200 - y), surface->pitch, 0, 0, 320, y);
 		_screen->updateScreenAndWait(25);
 	}
 
@@ -529,7 +534,7 @@ void ScreenEffects::vfx19(Graphics::Surface *surface, byte *palette, byte *newPa
 // "Screen slide in" bottom to top
 void ScreenEffects::vfx20(Graphics::Surface *surface, byte *palette, byte *newPalette, int colorCount) {
 	for (int y = 4; y <= 200; y += 4) {
-		_screen->copyRectToScreen((const byte*)surface->getBasePtr(0, 0), surface->pitch, 0, 200 - y, 320, y);
+		_screen->copyRectToScreen(surface->getPixels(), surface->pitch, 0, 200 - y, 320, y);
 		_screen->updateScreenAndWait(25);
 	}
 

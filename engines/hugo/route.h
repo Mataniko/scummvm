@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -30,21 +30,18 @@
 #ifndef HUGO_ROUTE_H
 #define HUGO_ROUTE_H
 
+#include "common/rect.h"
+
 namespace Hugo {
 
 /**
  * Purpose of an automatic route
  */
-enum go_t {kRouteSpace, kRouteExit, kRouteLook, kRouteGet};
+enum RouteType {kRouteSpace, kRouteExit, kRouteLook, kRouteGet};
 
-struct Point {
-	int x;
-	int y;
-};
-
-struct segment_t {                                  // Search segment
-	int16 y;                                        // y position
-	int16 x1, x2;                                   // Range of segment
+struct Segment {                                    // Search segment
+	int16 _y;                                       // y position
+	int16 _x1, _x2;                                 // Range of segment
 };
 
 class Route {
@@ -55,7 +52,7 @@ public:
 	int16 getRouteIndex() const;
 
 	void processRoute();
-	bool startRoute(const go_t routeType, const int16 objId, int16 cx, int16 cy);
+	bool startRoute(const RouteType routeType, const int16 objId, int16 cx, int16 cy);
 	void setDirection(const uint16 keyCode);
 	void setWalk(const uint16 direction);
 
@@ -69,25 +66,27 @@ private:
 
 	uint16 _oldWalkDirection;                       // Last direction char
 
-	int16  _routeIndex;                             // Index into route list, or -1
-	go_t   _routeType;                              // Purpose of an automatic route
-	int16  _routeObjId;                             // Index of exit of object walking to
+	int16     _routeIndex;                          // Index into route list, or -1
+	RouteType _routeType;                           // Purpose of an automatic route
+	int16     _routeObjId;                          // Index of exit of object walking to
 
 	byte _boundaryMap[kYPix][kXPix];                // Boundary byte map
-	segment_t _segment[kMaxSeg];                    // List of points in fill-path
-	Point _route[kMaxNodes];                        // List of nodes in route (global)
+	Segment _segment[kMaxSeg];                      // List of points in fill-path
+	Common::Point _route[kMaxNodes];                // List of nodes in route (global)
 	int16 _segmentNumb;                             // Count number of segments
 	int16 _routeListIndex;                          // Index into route list
 	int16 _destX;
 	int16 _destY;
 	int16 _heroWidth;                               // Hero width
 	bool  _routeFoundFl;                            // TRUE when path found
-	bool  _fullStackFl;                             // TRUE if stack exhausted
 	bool  _fullSegmentFl;                           // Segments exhausted
+
+	// CHECKME: Never set to true, could be removed
+	bool  _fullStackFl;                             // TRUE if stack exhausted
 
 	void segment(int16 x, int16 y);
 	bool findRoute(const int16 cx, const int16 cy);
-	Point *newNode();
+	Common::Point *newNode();
 };
 
 } // End of namespace Hugo

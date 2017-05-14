@@ -8,7 +8,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -24,14 +24,17 @@
 #ifndef TINSEL_BMV_H
 #define TINSEL_BMV_H
 
+#include "common/coroutines.h"
 #include "common/file.h"
 
-#include "audio/audiostream.h"
 #include "audio/mixer.h"
 
-#include "tinsel/coroutine.h"
 #include "tinsel/object.h"
 #include "tinsel/palette.h"
+
+namespace Audio {
+class QueuingAudioStream;
+}
 
 namespace Tinsel {
 

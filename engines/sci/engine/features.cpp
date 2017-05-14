@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -40,11 +40,12 @@ GameFeatures::GameFeatures(SegManager *segMan, Kernel *kernel) : _segMan(segMan)
 	_moveCountType = kMoveCountUninitialized;
 #ifdef ENABLE_SCI32
 	_sci21KernelType = SCI_VERSION_NONE;
-	_sci2StringFunctionType = kSci2StringFunctionUninitialized;
 #endif
 	_usesCdTrack = Common::File::exists("cdaudio.map");
-	if (ConfMan.hasKey("use_cdaudio") && !ConfMan.getBool("use_cdaudio"))
+	if (!ConfMan.getBool("use_cdaudio"))
 		_usesCdTrack = false;
+	_forceDOSTracks = false;
+	_pseudoMouseAbility = kPseudoMouseAbilityUninitialized;
 }
 
 reg_t GameFeatures::getDetectionAddr(const Common::String &objName, Selector slc, int methodNum) {
@@ -73,11 +74,11 @@ bool GameFeatures::autoDetectSoundType() {
 	// Look up the script address
 	reg_t addr = getDetectionAddr("Sound", SELECTOR(play));
 
-	if (!addr.segment)
+	if (!addr.getSegment())
 		return false;
 
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
+	uint16 offset = addr.getOffset();
+	Script *script = _segMan->getScript(addr.getSegment());
 	uint16 intParam = 0xFFFF;
 	bool foundTarget = false;
 
@@ -142,8 +143,8 @@ SciVersion GameFeatures::detectDoSoundType() {
 			//  SCI0LATE. Although the last SCI0EARLY game (lsl2) uses SCI0LATE resources
 			_doSoundType = g_sci->getResMan()->detectEarlySound() ? SCI_VERSION_0_EARLY : SCI_VERSION_0_LATE;
 #ifdef ENABLE_SCI32
-		} else if (getSciVersion() >= SCI_VERSION_2_1) {
-			_doSoundType = SCI_VERSION_2_1;
+		} else if (getSciVersion() >= SCI_VERSION_2_1_EARLY) {
+			_doSoundType = SCI_VERSION_2_1_EARLY;
 #endif
 		} else if (SELECTOR(nodePtr) == -1) {
 			// No nodePtr selector, so this game is definitely using newer
@@ -220,11 +221,11 @@ bool GameFeatures::autoDetectLofsType(Common::String gameSuperClassName, int met
 	// Look up the script address
 	reg_t addr = getDetectionAddr(gameSuperClassName.c_str(), -1, methodNum);
 
-	if (!addr.segment)
+	if (!addr.getSegment())
 		return false;
 
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
+	uint16 offset = addr.getOffset();
+	Script *script = _segMan->getScript(addr.getSegment());
 
 	while (true) {
 		int16 opparams[4];
@@ -270,7 +271,7 @@ SciVersion GameFeatures::detectLofsType() {
 			return _lofsType;
 		}
 
-		if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1) {
+		if (getSciVersion() >= SCI_VERSION_1_1 && getSciVersion() <= SCI_VERSION_2_1_LATE) {
 			// SCI1.1 type, i.e. we compensate for the fact that the heap is attached
 			// to the end of the script
 			_lofsType = SCI_VERSION_1_1;
@@ -319,11 +320,11 @@ bool GameFeatures::autoDetectGfxFunctionsType(int methodNum) {
 	// Look up the script address
 	reg_t addr = getDetectionAddr("Rm", SELECTOR(overlay), methodNum);
 
-	if (!addr.segment)
+	if (!addr.getSegment())
 		return false;
 
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
+	uint16 offset = addr.getOffset();
+	Script *script = _segMan->getScript(addr.getSegment());
 
 	while (true) {
 		int16 opparams[4];
@@ -343,9 +344,9 @@ bool GameFeatures::autoDetectGfxFunctionsType(int methodNum) {
 			if (kFuncNum == 8) {	// kDrawPic	(SCI0 - SCI11)
 				// If kDrawPic is called with 6 parameters from the overlay
 				// selector, the game is using old graphics functions.
-				// Otherwise, if it's called with 8 parameters, it's using new
-				// graphics functions.
-				_gfxFunctionsType = (argc == 8) ? SCI_VERSION_0_LATE : SCI_VERSION_0_EARLY;
+				// Otherwise, if it's called with 8 parameters (e.g. SQ3) or 4 parameters
+				// (e.g. Hoyle 1/2), it's using new graphics functions.
+				_gfxFunctionsType = (argc == 6) ? SCI_VERSION_0_EARLY : SCI_VERSION_0_LATE;
 				return true;
 			}
 		}
@@ -447,7 +448,7 @@ SciVersion GameFeatures::detectMessageFunctionType() {
 	// Only v2 Message resources use the kGetMessage kernel function.
 	// v3-v5 use the kMessage kernel function.
 
-	if (READ_SCI11ENDIAN_UINT32(res->data) / 1000 == 2)
+	if (res->getUint32SEAt(0) / 1000 == 2)
 		_messageFunctionType = SCI_VERSION_1_LATE;
 	else
 		_messageFunctionType = SCI_VERSION_1_1;
@@ -465,19 +466,27 @@ bool GameFeatures::autoDetectSci21KernelType() {
 		// This case doesn't occur in early SCI2.1 games, and we've only
 		// seen it happen in the RAMA demo, thus we can assume that the
 		// game is using a SCI2.1 table
+
+		// HACK: The Inside the Chest Demo and King's Questions minigame
+		// don't have sounds at all, but they're using a SCI2 kernel
+		if (g_sci->getGameId() == GID_CHEST || g_sci->getGameId() == GID_KQUESTIONS) {
+			_sci21KernelType = SCI_VERSION_2;
+			return true;
+		}
+
 		warning("autoDetectSci21KernelType(): Sound object not loaded, assuming a SCI2.1 table");
-		_sci21KernelType = SCI_VERSION_2_1;
+		_sci21KernelType = SCI_VERSION_2_1_EARLY;
 		return true;
 	}
 
 	// Look up the script address
 	reg_t addr = getDetectionAddr("Sound", SELECTOR(play));
 
-	if (!addr.segment)
+	if (!addr.getSegment())
 		return false;
 
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
+	uint16 offset = addr.getOffset();
+	Script *script = _segMan->getScript(addr.getSegment());
 
 	while (true) {
 		int16 opparams[4];
@@ -487,7 +496,9 @@ bool GameFeatures::autoDetectSci21KernelType() {
 		opcode = extOpcode >> 1;
 
 		// Check for end of script
-		if (opcode == op_ret || offset >= script->getBufSize())
+		// We don't check for op_ret here because the Phantasmagoria Mac script
+		// has an op_ret early on in its script (controlled by a branch).
+		if (offset >= script->getBufSize())
 			break;
 
 		if (opcode == op_callk) {
@@ -503,7 +514,7 @@ bool GameFeatures::autoDetectSci21KernelType() {
 				_sci21KernelType = SCI_VERSION_2;
 				return true;
 			} else if (kFuncNum == 0x75) {
-				_sci21KernelType = SCI_VERSION_2_1;
+				_sci21KernelType = SCI_VERSION_2_1_EARLY;
 				return true;
 			}
 		}
@@ -521,76 +532,96 @@ SciVersion GameFeatures::detectSci21KernelType() {
 	}
 	return _sci21KernelType;
 }
-
-Sci2StringFunctionType GameFeatures::detectSci2StringFunctionType() {
-	if (_sci2StringFunctionType == kSci2StringFunctionUninitialized) {
-		if (getSciVersion() <= SCI_VERSION_1_1) {
-			error("detectSci21StringFunctionType() called from SCI1.1 or earlier");
-		} else if (getSciVersion() == SCI_VERSION_2) {
-			// SCI2 games are always using the old type
-			_sci2StringFunctionType = kSci2StringFunctionOld;
-		} else if (getSciVersion() == SCI_VERSION_3) {
-			// SCI3 games are always using the new type
-			_sci2StringFunctionType = kSci2StringFunctionNew;
-		} else {	// SCI2.1
-			if (!autoDetectSci21StringFunctionType())
-				_sci2StringFunctionType = kSci2StringFunctionOld;
-			else
-				_sci2StringFunctionType = kSci2StringFunctionNew;
-		}
-	}
-
-	debugC(1, kDebugLevelVM, "Detected SCI2 kString type: %s", (_sci2StringFunctionType == kSci2StringFunctionOld) ? "old" : "new");
-
-	return _sci2StringFunctionType;
-}
-
-bool GameFeatures::autoDetectSci21StringFunctionType() {
-	// Look up the script address
-	reg_t addr = getDetectionAddr("Str", SELECTOR(size));
-
-	if (!addr.segment)
-		return false;
-
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
-
-	while (true) {
-		int16 opparams[4];
-		byte extOpcode;
-		byte opcode;
-		offset += readPMachineInstruction(script->getBuf(offset), extOpcode, opparams);
-		opcode = extOpcode >> 1;
-
-		// Check for end of script
-		if (opcode == op_ret || offset >= script->getBufSize())
-			break;
-
-		if (opcode == op_callk) {
-			uint16 kFuncNum = opparams[0];
-
-			// SCI2.1 games which use the new kString functions call kString(8).
-			// Earlier ones call the callKernel script function, but not kString
-			// directly
-			if (_kernel->getKernelName(kFuncNum) == "String")
-				return true;
-		}
-	}
-
-	return false;	// not found a call to kString
-}
-
 #endif
+
+bool GameFeatures::supportsSpeechWithSubtitles() const {
+	switch (g_sci->getGameId()) {
+	case GID_SQ4:
+	case GID_FREDDYPHARKAS:
+	case GID_ECOQUEST:
+	case GID_LSL6:
+	case GID_LAURABOW2:
+	case GID_KQ6:
+#ifdef ENABLE_SCI32
+	// TODO: Hoyle5, SCI3
+	case GID_GK1:
+	case GID_KQ7:
+	case GID_LSL6HIRES:
+	case GID_PQ4:
+	case GID_QFG4:
+	case GID_SQ6:
+	case GID_TORIN:
+#endif
+		return true;
+
+	default:
+		return false;
+	}
+}
+
+bool GameFeatures::audioVolumeSyncUsesGlobals() const {
+	switch (g_sci->getGameId()) {
+	case GID_GK1:
+	case GID_GK2:
+	case GID_LSL6HIRES:
+	case GID_PHANTASMAGORIA:
+	case GID_TORIN:
+		// TODO: SCI3
+		return true;
+	default:
+		return false;
+	}
+}
+
+MessageTypeSyncStrategy GameFeatures::getMessageTypeSyncStrategy() const {
+	if (getSciVersion() < SCI_VERSION_1_1) {
+		return kMessageTypeSyncStrategyNone;
+	}
+
+	if (getSciVersion() == SCI_VERSION_1_1 && g_sci->isCD()) {
+		return kMessageTypeSyncStrategyDefault;
+	}
+
+#ifdef ENABLE_SCI32
+	switch (g_sci->getGameId()) {
+	// TODO: Hoyle5, SCI3
+	case GID_GK1:
+	case GID_PQ4:
+	case GID_QFG4:
+		return g_sci->isCD() ? kMessageTypeSyncStrategyDefault : kMessageTypeSyncStrategyNone;
+
+	case GID_KQ7:
+	case GID_MOTHERGOOSEHIRES:
+	case GID_PHANTASMAGORIA:
+	case GID_SQ6:
+	case GID_TORIN:
+		return kMessageTypeSyncStrategyDefault;
+
+	case GID_LSL6HIRES:
+		return kMessageTypeSyncStrategyLSL6Hires;
+
+	case GID_SHIVERS:
+		return kMessageTypeSyncStrategyShivers;
+
+	case GID_GK2:
+	case GID_PQSWAT:
+	default:
+		break;
+	}
+#endif
+
+	return kMessageTypeSyncStrategyNone;
+}
 
 bool GameFeatures::autoDetectMoveCountType() {
 	// Look up the script address
 	reg_t addr = getDetectionAddr("Motion", SELECTOR(doit));
 
-	if (!addr.segment)
+	if (!addr.getSegment())
 		return false;
 
-	uint16 offset = addr.offset;
-	Script *script = _segMan->getScript(addr.segment);
+	uint16 offset = addr.getOffset();
+	Script *script = _segMan->getScript(addr.getSegment());
 	bool foundTarget = false;
 
 	while (true) {
@@ -642,7 +673,7 @@ MoveCountType GameFeatures::detectMoveCountType() {
 }
 
 bool GameFeatures::useAltWinGMSound() {
-	if (g_sci && g_sci->getPlatform() == Common::kPlatformWindows && g_sci->isCD()) {
+	if (g_sci && g_sci->getPlatform() == Common::kPlatformWindows && g_sci->isCD() && !_forceDOSTracks) {
 		SciGameId id = g_sci->getGameId();
 		return (id == GID_ECOQUEST ||
 				id == GID_JONES ||
@@ -652,6 +683,52 @@ bool GameFeatures::useAltWinGMSound() {
 	} else {
 		return false;
 	}
+}
+
+// PseudoMouse was added during SCI1
+// PseudoMouseAbility is about a tiny difference in the keyboard driver, which sets the event type to either
+// 40h (old behaviour) or 44h (the keyboard driver actually added 40h to the existing value).
+// See engine/kevent.cpp, kMapKeyToDir - also script 933
+
+// SCI1EGA:
+// Quest for Glory 2 still used the old way.
+//
+// SCI1EARLY:
+// King's Quest 5 0.000.062 uses the old way.
+// Leisure Suit Larry 1 demo uses the new way, but no PseudoMouse class.
+// Fairy Tales uses the new way.
+// X-Mas 1990 uses the old way, no PseudoMouse class.
+// Space Quest 4 floppy (1.1) uses the new way.
+// Mixed Up Mother Goose uses the old way, no PseudoMouse class.
+//
+// SCI1MIDDLE:
+// Leisure Suit Larry 5 demo uses the new way.
+// Conquests of the Longbow demo uses the new way.
+// Leisure Suit Larry 1 (2.0) uses the new way.
+// Astro Chicken II uses the new way.
+PseudoMouseAbilityType GameFeatures::detectPseudoMouseAbility() {
+	if (_pseudoMouseAbility == kPseudoMouseAbilityUninitialized) {
+		if (getSciVersion() < SCI_VERSION_1_EARLY) {
+			// SCI1 EGA or earlier -> pseudo mouse ability is always disabled
+			_pseudoMouseAbility = kPseudoMouseAbilityFalse;
+
+		} else if (getSciVersion() == SCI_VERSION_1_EARLY) {
+			// For SCI1 early some games had it enabled, some others didn't.
+			// We try to find an object called "PseudoMouse". If it's found, we enable the ability otherwise we don't.
+			reg_t pseudoMouseAddr = _segMan->findObjectByName("PseudoMouse", 0);
+
+			if (pseudoMouseAddr != NULL_REG) {
+				_pseudoMouseAbility = kPseudoMouseAbilityTrue;
+			} else {
+				_pseudoMouseAbility = kPseudoMouseAbilityFalse;
+			}
+
+		} else {
+			// SCI1 middle or later -> pseudo mouse ability is always enabled
+			_pseudoMouseAbility = kPseudoMouseAbilityTrue;
+		}
+	}
+	return _pseudoMouseAbility;
 }
 
 } // End of namespace Sci

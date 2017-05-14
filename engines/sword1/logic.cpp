@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -959,7 +959,7 @@ int Logic::fnPlaySequence(Object *cpt, int32 id, int32 sequenceId, int32 d, int3
 	// meantime, we don't want any looping sound effects still playing.
 	_sound->quitScreen();
 
-	MoviePlayer *player = makeMoviePlayer(sequenceId, _vm, _textMan, _resMan, _mixer, _system);
+	MoviePlayer *player = makeMoviePlayer(sequenceId, _vm, _textMan, _resMan, _system);
 	if (player) {
 		_screen->clearScreen();
 		if (player->load(sequenceId))

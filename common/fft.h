@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -34,6 +34,8 @@
 
 namespace Common {
 
+class CosineTable;
+
 /**
  * (Inverse) Fast Fourier Transform.
  *
@@ -44,6 +46,8 @@ class FFT {
 public:
 	FFT(int bits, int inverse);
 	~FFT();
+
+	const uint16 *getRevTab() const;
 
 	/** Do the permutation needed BEFORE calling calc(). */
 	void permute(Complex *z);
@@ -64,13 +68,16 @@ private:
 	Complex *_expTab;
 	Complex *_tmpBuf;
 
-	const float *_tSin;
-	const float *_tCos;
-
 	int _splitRadix;
-	int _permutation;
 
 	static int splitRadixPermutation(int i, int n, int inverse);
+
+	CosineTable *_cosTables[13];
+
+	void fft4(Complex *z);
+	void fft8(Complex *z);
+	void fft16(Complex *z);
+	void fft(int n, int logn, Complex *z);
 };
 
 } // End of namespace Common

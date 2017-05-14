@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "common/rect.h"
@@ -42,7 +43,7 @@ namespace GUI {
 
 Dialog::Dialog(int x, int y, int w, int h)
 	: GuiObject(x, y, w, h),
-	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _visible(false),
+	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _tickleWidget(0), _visible(false),
 	_backgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
 	// Some dialogs like LauncherDialog use internally a fixed size, even though
 	// their widgets rely on the layout to be initialized correctly by the theme.
@@ -50,11 +51,13 @@ Dialog::Dialog(int x, int y, int w, int h)
 	// will for example crash after returning to the launcher when the user
 	// started a 640x480 game with a non 1x scaler.
 	g_gui.checkScreenChange();
+
+	_result = -1;
 }
 
 Dialog::Dialog(const Common::String &name)
 	: GuiObject(name),
-	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _visible(false),
+	  _mouseWidget(0), _focusedWidget(0), _dragWidget(0), _tickleWidget(0), _visible(false),
 	_backgroundType(GUI::ThemeEngine::kDialogBackgroundDefault) {
 
 	// It may happen that we have 3x scaler in launcher (960xY) and then 640x480
@@ -65,6 +68,8 @@ Dialog::Dialog(const Common::String &name)
 	// Fixes bug #1590596: "HE: When 3x graphics are choosen, F5 crashes game"
 	// and bug #1595627: "SCUMM: F5 crashes game (640x480)"
 	g_gui.checkScreenChange();
+
+	_result = -1;
 }
 
 int Dialog::runModal() {
@@ -108,13 +113,21 @@ void Dialog::reflowLayout() {
 	// changed, so any cached image may be invalid. The subsequent redraw
 	// should be treated as the very first draw.
 
+	GuiObject::reflowLayout();
+
 	Widget *w = _firstWidget;
 	while (w) {
 		w->reflowLayout();
 		w = w->_next;
 	}
+}
 
-	GuiObject::reflowLayout();
+void Dialog::lostFocus() {
+	_dragWidget = NULL;
+
+	if (_tickleWidget) {
+		_tickleWidget->lostFocus();
+	}
 }
 
 void Dialog::setFocusWidget(Widget *widget) {
@@ -212,7 +225,7 @@ void Dialog::handleMouseWheel(int x, int y, int direction) {
 	if (!w)
 		w = _focusedWidget;
 	if (w)
-		w->handleMouseWheel(x, y, direction);
+		w->handleMouseWheel(x - (w->getAbsX() - _x), y - (w->getAbsY() - _y), direction);
 }
 
 void Dialog::handleKeyDown(Common::KeyState state) {
@@ -243,7 +256,18 @@ void Dialog::handleKeyDown(Common::KeyState state) {
 		close();
 	}
 
-	// TODO: tab/shift-tab should focus the next/previous focusable widget
+	if (state.keycode == Common::KEYCODE_TAB) {
+		// TODO: Maybe add Tab behaviours for all widgets too.
+		// searches through widgets on screen for tab widget
+		Widget *w = _firstWidget;
+		while (w) {
+			if (w->_type == kTabWidget)
+				if (w->handleKeyDown(state))
+					return;
+
+			w = w->_next;
+		}
+	}
 }
 
 void Dialog::handleKeyUp(Common::KeyState state) {
@@ -308,6 +332,9 @@ void Dialog::handleTickle() {
 	// Focused widget receives tickle notifications
 	if (_focusedWidget && _focusedWidget->getFlags() & WIDGET_WANT_TICKLE)
 		_focusedWidget->handleTickle();
+
+	if (_tickleWidget && _tickleWidget->getFlags() & WIDGET_WANT_TICKLE)
+		_tickleWidget->handleTickle();
 }
 
 void Dialog::handleCommand(CommandSender *sender, uint32 cmd, uint32 data) {
@@ -334,11 +361,11 @@ Widget *Dialog::findWidget(const char *name) {
 }
 
 void Dialog::removeWidget(Widget *del) {
-	if (del == _mouseWidget)
+	if (del == _mouseWidget || del->containsWidget(_mouseWidget))
 		_mouseWidget = NULL;
-	if (del == _focusedWidget)
+	if (del == _focusedWidget || del->containsWidget(_focusedWidget))
 		_focusedWidget = NULL;
-	if (del == _dragWidget)
+	if (del == _dragWidget || del->containsWidget(_dragWidget))
 		_dragWidget = NULL;
 
 	GuiObject::removeWidget(del);

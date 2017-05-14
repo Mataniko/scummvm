@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -56,33 +56,33 @@ public:
 	struct InventoryEntry : Common::Serializable {
 		CursorStyle cursor;
 		SceneIndex scene;
-		byte field_2;
+		byte usable;
 		bool isSelectable;
-		bool isPresent;
-		bool manualSelect;
+		bool inPocket;
+		bool floating;
 		ObjectLocation location;
 
 		InventoryEntry() {
 			cursor = kCursorNormal;
 			scene = kSceneNone;
-			field_2 = 0;
+			usable = 0;
 			isSelectable = false;
-			isPresent = false;
-			manualSelect = true;
+			inPocket = false;
+			floating = true;
 			location = kObjectLocationNone;
 		}
 
 		Common::String toString() {
-			return Common::String::format("{ %d - %d - %d - %d - %d - %d - %d }", cursor, scene, field_2, isSelectable, isPresent, manualSelect, location);
+			return Common::String::format("{ %d - %d - %d - %d - %d - %d - %d }", cursor, scene, usable, isSelectable, inPocket, floating, location);
 		}
 
 		void saveLoadWithSerializer(Common::Serializer &s) {
 			s.syncAsByte(cursor);
 			s.syncAsByte(scene);
-			s.syncAsByte(field_2);
+			s.syncAsByte(usable);
 			s.syncAsByte(isSelectable);
-			s.syncAsByte(isPresent);
-			s.syncAsByte(manualSelect);
+			s.syncAsByte(inPocket);
+			s.syncAsByte(floating);
 			s.syncAsByte(location);
 		}
 	};
@@ -106,11 +106,10 @@ public:
 
 	// UI Control
 	void show();
-	void blinkEgg(bool enabled);
-	void showHourGlass();
-	void setPortrait(InventoryItem item);
-	void drawEgg();
-	void drawBlinkingEgg();
+	void showHourGlass() const;
+	void setPortrait(InventoryItem item) const;
+	void drawEgg() const;
+	void drawBlinkingEgg(uint ticks = 1);
 
 	// Handle inventory UI events.
 	void handleMouseEvent(const Common::Event &ev);
@@ -133,8 +132,6 @@ public:
 	Common::String toString();
 
 private:
-	static const uint32 _defaultBlinkingInterval = 250; ///< Default blinking interval in ms
-
 	LastExpressEngine *_engine;
 
 	InventoryEntry _entries[32];
@@ -144,9 +141,7 @@ private:
 	uint32 _itemsShown;
 
 	bool _showingHourGlass;
-	bool _blinkingEgg;
-	uint32 _blinkingTime;
-	uint32 _blinkingInterval;
+	int16  _blinkingDirection;
 	uint16 _blinkingBrightness;
 
 	// Flags
@@ -157,8 +152,6 @@ private:
 
 	Scene *_itemScene;
 
-	// Important rects
-	//Common::Rect _inventoryRect;
 	Common::Rect _menuEggRect;
 	Common::Rect _selectedItemRect;
 
@@ -168,14 +161,15 @@ private:
 	void close();
 	void examine(InventoryItem item);
 	void drawHighlight(uint32 currentIndex, bool reset);
-	uint32 getItemIndex(uint32 currentIndex);
+	uint32 getItemIndex(uint32 currentIndex) const;
 
 	bool isItemSceneParameter(InventoryItem item) const;
 
-	void drawItem(CursorStyle id, uint16 x, uint16 y, int16 brighnessIndex = -1);
+	void drawItem(CursorStyle id, uint16 x, uint16 y, int16 brighnessIndex = -1) const;
+	void blinkEgg();
 
 	void drawSelectedItem();
-	void clearSelectedItem();
+	void clearSelectedItem() const;
 };
 
 } // End of namespace LastExpress

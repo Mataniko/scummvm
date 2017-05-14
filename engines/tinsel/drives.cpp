@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -48,13 +48,13 @@ void CdCD(CORO_PARAM) {
 	CORO_BEGIN_CODE(_ctx);
 
 	while (g_bChangingCD) {
-		if (g_scheduler->getCurrentProcess()) {
-			// FIXME: CdCD gets passed a nullContext in RegisterGlobals() and
+		if (CoroScheduler.getCurrentProcess()) {
+			// FIXME: CdCD gets passed a Common::nullContext in RegisterGlobals() and
 			//        PrimeSceneHopper(), because I didn't know how to get a proper
 			//        context without converting the whole calling stack to CORO'd
 			//        functions. If these functions really get called while a CD
 			//        change is requested, this needs to be resolved.
-			if (coroParam == nullContext)
+			if (coroParam == Common::nullContext)
 				error("CdCD needs context");
 			CORO_SLEEP(1);
 		} else
@@ -149,7 +149,7 @@ bool GotoCD() {
 
 bool TinselFile::_warningShown = false;
 
-TinselFile::TinselFile() : ReadStreamEndian((_vm->getFeatures() & GF_BIG_ENDIAN) != 0) {
+TinselFile::TinselFile() : ReadStreamEndian(TinselV1Mac) {
 	_stream = NULL;
 }
 

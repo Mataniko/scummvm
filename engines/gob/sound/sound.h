@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -23,22 +23,28 @@
 #ifndef GOB_SOUND_SOUND_H
 #define GOB_SOUND_SOUND_H
 
+#include "common/str.h"
 #include "gob/sound/sounddesc.h"
-#include "gob/sound/bgatmosphere.h"
 
 namespace Gob {
 
 class GobEngine;
+class BackgroundAtmosphere;
 class PCSpeaker;
 class SoundBlaster;
 class ADLPlayer;
-class MDYPlayer;
+class MUSPlayer;
 class Infogrames;
 class Protracker;
 class CDROM;
 
 class Sound {
 public:
+	enum BackgroundPlayMode {
+		kPlayModeLinear,
+		kPlayModeRandom
+	};
+
 	static const int kSoundsCount = 60;
 
 	Sound(GobEngine *vm);
@@ -51,7 +57,7 @@ public:
 	const SoundDesc *sampleGetBySlot(int slot) const;
 	int sampleGetNextFreeSlot() const;
 
-	bool sampleLoad(SoundDesc *sndDesc, SoundType type, const char *fileName, bool tryExist = true);
+	bool sampleLoad(SoundDesc *sndDesc, SoundType type, const char *fileName);
 	void sampleFree(SoundDesc *sndDesc, bool noteAdLib = false, int index = -1);
 
 
@@ -60,9 +66,10 @@ public:
 			int16 frequency, int16 fadeLength = 0);
 	void blasterStop(int16 fadeLength, SoundDesc *sndDesc = 0);
 
-	void blasterPlayComposition(int16 *composition, int16 freqVal,
+	void blasterPlayComposition(const int16 *composition, int16 freqVal,
 			SoundDesc *sndDescs = 0, int8 sndCount = kSoundsCount);
 	void blasterStopComposition();
+	void blasterRepeatComposition(int32 repCount);
 
 	char blasterPlayingSound() const;
 
@@ -92,9 +99,10 @@ public:
 	bool adlibIsPlaying() const;
 
 	int adlibGetIndex() const;
-	bool adlibGetRepeating() const;
+	int32 adlibGetRepeating() const;
 
 	void adlibSetRepeating(int32 repCount);
+	void adlibSyncVolume();
 
 
 	// Infogrames
@@ -133,7 +141,7 @@ public:
 	void bgPlay(const char *base, const char *ext, SoundType type, int count);
 	void bgStop();
 
-	void bgSetPlayMode(BackgroundAtmosphere::PlayMode mode);
+	void bgSetPlayMode(BackgroundPlayMode mode);
 
 	void bgShade();
 	void bgUnshade();
@@ -142,17 +150,30 @@ private:
 	GobEngine *_vm;
 
 	bool _hasAdLib;
+	bool _hasAdLibBg;
 
 	SoundDesc _sounds[kSoundsCount];
 
+	// Speaker
 	PCSpeaker *_pcspeaker;
+
+	// PCM based
 	SoundBlaster *_blaster;
+	BackgroundAtmosphere *_bgatmos;
+
+	// AdLib
+	MUSPlayer *_mdyPlayer;
 	ADLPlayer *_adlPlayer;
-	MDYPlayer *_mdyPlayer;
+
+	// Amiga Paula
 	Infogrames *_infogrames;
 	Protracker *_protracker;
+
+	// Audio CD
 	CDROM *_cdrom;
-	BackgroundAtmosphere *_bgatmos;
+
+	void createMDYPlayer();
+	void createADLPlayer();
 };
 
 } // End of namespace Gob

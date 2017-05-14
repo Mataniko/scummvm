@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -82,26 +82,19 @@ void KyraEngine_v2::resetItem(int index) {
 }
 
 void KyraEngine_v2::setHandItem(Item item) {
-	Screen *scr = screen();
-	scr->hideMouse();
-
 	if (item == kItemNone) {
 		removeHandItem();
 	} else {
 		setMouseCursor(item);
 		_itemInHand = item;
 	}
-
-	scr->showMouse();
 }
 
 void KyraEngine_v2::removeHandItem() {
 	Screen *scr = screen();
-	scr->hideMouse();
 	scr->setMouseCursor(0, 0, getShapePtr(0));
 	_itemInHand = kItemNone;
 	_mouseState = kItemNone;
-	scr->showMouse();
 }
 
 } // end of namesapce Kyra

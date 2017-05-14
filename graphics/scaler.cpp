@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -152,7 +152,7 @@ void InitScalers(uint32 BitFormat) {
 		g_dotmatrix[12] = g_dotmatrix[14] = format.RGBToColor(63, 63, 63);
 }
 
-void DestroyScalers(){
+void DestroyScalers() {
 #ifdef USE_HQ_SCALERS
 	free(RGBtoYUV);
 	RGBtoYUV = 0;
@@ -167,12 +167,12 @@ void DestroyScalers(){
 void Normal1x(const uint8 *srcPtr, uint32 srcPitch, uint8 *dstPtr, uint32 dstPitch,
 							int width, int height) {
 	// Spot the case when it can all be done in 1 hit
-	if ((srcPitch == sizeof(OverlayColor) * (uint)width) && (dstPitch == sizeof(OverlayColor) * (uint)width)) {
-		memcpy(dstPtr, srcPtr, sizeof(OverlayColor) * width * height);
+	if ((srcPitch == sizeof(uint16) * (uint)width) && (dstPitch == sizeof(uint16) * (uint)width)) {
+		memcpy(dstPtr, srcPtr, sizeof(uint16) * width * height);
 		return;
 	}
 	while (height--) {
-		memcpy(dstPtr, srcPtr, sizeof(OverlayColor) * width);
+		memcpy(dstPtr, srcPtr, sizeof(uint16) * width);
 		srcPtr += srcPitch;
 		dstPtr += dstPitch;
 	}
@@ -207,11 +207,10 @@ void Normal2x(const uint8 *srcPtr, uint32 srcPitch, uint8 *dstPtr, uint32 dstPit
 	uint8 *r;
 
 	assert(IS_ALIGNED(dstPtr, 4));
-	assert(sizeof(OverlayColor) == 2);
 	while (height--) {
 		r = dstPtr;
 		for (int i = 0; i < width; ++i, r += 4) {
-			uint32 color = *(((const OverlayColor *)srcPtr) + i);
+			uint32 color = *(((const uint16 *)srcPtr) + i);
 
 			color |= color << 16;
 

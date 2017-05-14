@@ -20,7 +20,7 @@
  *
  */
 
-//#define ENABLE_XCODE
+#define ENABLE_XCODE
 
 // HACK to allow building with the SDL backend on MinGW
 // see bug #1800764 "TOOLS: MinGW tools building broken"
@@ -31,6 +31,7 @@
 #include "config.h"
 #include "create_project.h"
 
+#include "cmake.h"
 #include "codeblocks.h"
 #include "msvc.h"
 #include "visualstudio.h"
@@ -39,10 +40,11 @@
 
 #include <fstream>
 #include <iostream>
-
+#include <sstream>
 #include <stack>
 #include <algorithm>
 #include <iomanip>
+#include <iterator>
 
 #include <cstring>
 #include <cstdlib>
@@ -52,13 +54,14 @@
 #define USE_WIN32_API
 #endif
 
-#ifdef USE_WIN32_API
+#if (defined(_WIN32) || defined(WIN32))
 #include <windows.h>
 #else
 #include <sstream>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
 #endif
 
 namespace {
@@ -76,14 +79,6 @@ namespace {
 std::string unifyPath(const std::string &path);
 
 /**
- * Returns the last path component.
- *
- * @param path Path string.
- * @return Last path component.
- */
-std::string getLastPathComponent(const std::string &path);
-
-/**
  * Display the help text for the program.
  *
  * @param exe Name of the executable.
@@ -91,48 +86,16 @@ std::string getLastPathComponent(const std::string &path);
 void displayHelp(const char *exe);
 
 /**
- * Structure for describing an FSNode. This is a very minimalistic
- * description, which includes everything we need.
- * It only contains the name of the node and whether it is a directory
- * or not.
+ * Build a list of options to enable or disable GCC warnings
+ *
+ * @param globalWarnings Resulting list of warnings
  */
-struct FSNode {
-	FSNode() : name(), isDirectory(false) {}
-	FSNode(const std::string &n, bool iD) : name(n), isDirectory(iD) {}
-
-	std::string name; ///< Name of the file system node
-	bool isDirectory; ///< Whether it is a directory or not
-};
-
-typedef std::list<FSNode> FileList;
-
-typedef StringList TokenList;
-
-/**
- * Takes a given input line and creates a list of tokens out of it.
- *
- * A token in this context is separated by whitespaces. A special case
- * are quotation marks though. A string inside quotation marks is treated
- * as single token, even when it contains whitespaces.
- *
- * Thus for example the input:
- * foo bar "1 2 3 4" ScummVM
- * will create a list with the following entries:
- * "foo", "bar", "1 2 3 4", "ScummVM"
- * As you can see the quotation marks will get *removed* too.
- *
- * You can also use this with non-whitespace by passing another separator
- * character (e.g. ',').
- *
- * @param input The text to be tokenized.
- * @param separator The token separator.
- * @return A list of tokens.
- */
-TokenList tokenize(const std::string &input, char separator = ' ');
+void addGCCWarnings(StringList &globalWarnings);
 } // End of anonymous namespace
 
 enum ProjectType {
 	kProjectNone,
+	kProjectCMake,
 	kProjectCodeBlocks,
 	kProjectMSVC,
 	kProjectXcode
@@ -141,7 +104,7 @@ enum ProjectType {
 int main(int argc, char *argv[]) {
 #ifndef USE_WIN32_API
 	// Initialize random number generator for UUID creation
-	std::srand((uint)std::time(0));
+	std::srand((unsigned int)std::time(0));
 #endif
 
 	if (argc < 2) {
@@ -160,7 +123,7 @@ int main(int argc, char *argv[]) {
 	setup.filePrefix = setup.srcDir;
 	setup.outputDir = '.';
 
-	setup.engines = parseConfigure(setup.srcDir);
+	setup.engines = parseEngines(setup.srcDir);
 
 	if (setup.engines.empty()) {
 		std::cout << "WARNING: No engines found in configure file or configure file missing in \"" << setup.srcDir << "\"\n";
@@ -170,7 +133,7 @@ int main(int argc, char *argv[]) {
 	setup.features = getAllFeatures();
 
 	ProjectType projectType = kProjectNone;
-	int msvcVersion = 9;
+	int msvcVersion = 12;
 
 	// Parse command line arguments
 	using std::cout;
@@ -186,6 +149,14 @@ int main(int argc, char *argv[]) {
 			cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 
 			return 0;
+
+		} else if (!std::strcmp(argv[i], "--cmake")) {
+			if (projectType != kProjectNone) {
+				std::cerr << "ERROR: You cannot pass more than one project type!\n";
+				return -1;
+			}
+
+			projectType = kProjectCMake;
 
 		} else if (!std::strcmp(argv[i], "--codeblocks")) {
 			if (projectType != kProjectNone) {
@@ -221,7 +192,7 @@ int main(int argc, char *argv[]) {
 
 			msvcVersion = atoi(argv[++i]);
 
-			if (msvcVersion != 8 && msvcVersion != 9 && msvcVersion != 10) {
+			if (msvcVersion != 9 && msvcVersion != 10 && msvcVersion != 11 && msvcVersion != 12 && msvcVersion != 14 && msvcVersion != 15) {
 				std::cerr << "ERROR: Unsupported version: \"" << msvcVersion << "\" passed to \"--msvc-version\"!\n";
 				return -1;
 			}
@@ -296,7 +267,7 @@ int main(int argc, char *argv[]) {
 				setup.filePrefix.erase(setup.filePrefix.size() - 1);
 		} else if (!std::strcmp(argv[i], "--output-dir")) {
 			if (i + 1 >= argc) {
-				std::cerr << "ERROR: Missing \"path\" parameter for \"--output-dirx\"!\n";
+				std::cerr << "ERROR: Missing \"path\" parameter for \"--output-dir\"!\n";
 				return -1;
 			}
 
@@ -311,9 +282,35 @@ int main(int argc, char *argv[]) {
 			setup.createInstaller = true;
 		} else if (!std::strcmp(argv[i], "--tools")) {
 			setup.devTools = true;
+		} else if (!std::strcmp(argv[i], "--tests")) {
+			setup.tests = true;
+		} else if (!std::strcmp(argv[i], "--sdl1")) {
+			setup.useSDL2 = false;
 		} else {
 			std::cerr << "ERROR: Unknown parameter \"" << argv[i] << "\"\n";
 			return -1;
+		}
+	}
+
+	// When building tests, disable some features
+	if (setup.tests) {
+		setFeatureBuildState("mt32emu", setup.features, false);
+		setFeatureBuildState("eventrecorder", setup.features, false);
+
+		for (EngineDescList::iterator j = setup.engines.begin(); j != setup.engines.end(); ++j)
+			j->enable = false;
+	}
+	
+	// Disable engines for which we are missing dependencies
+	for (EngineDescList::const_iterator i = setup.engines.begin(); i != setup.engines.end(); ++i) {
+		if (i->enable) {
+			for (StringList::const_iterator ef = i->requiredFeatures.begin(); ef != i->requiredFeatures.end(); ++ef) {
+				FeatureList::iterator feature = std::find(setup.features.begin(), setup.features.end(), *ef);
+				if (feature != setup.features.end() && !feature->enable) {
+					setEngineBuildState(i->name, setup.engines, false);
+					break;
+				}
+			}
 		}
 	}
 
@@ -342,6 +339,23 @@ int main(int argc, char *argv[]) {
 			cout << "    " << i->description << '\n';
 	}
 
+	// Check if the keymapper and the event recorder are enabled simultaneously
+	bool keymapperEnabled = false;
+	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
+		if (i->enable && !strcmp(i->name, "keymapper"))
+			keymapperEnabled = true;
+		if (i->enable && !strcmp(i->name, "eventrecorder") && keymapperEnabled) {
+			std::cerr << "ERROR: The keymapper and the event recorder cannot be enabled simultaneously currently, please disable one of the two\n";
+			return -1;
+		}
+	}
+
+	// Check if tools and tests are enabled simultaneously
+	if (setup.devTools && setup.tests) {
+		std::cerr << "ERROR: The tools and tests projects cannot be created simultaneously\n";
+		return -1;
+	}
+
 	// Setup defines and libraries
 	setup.defines = getEngineDefines(setup.engines);
 	setup.libraries = getFeatureLibraries(setup.features);
@@ -350,10 +364,65 @@ int main(int argc, char *argv[]) {
 	StringList featureDefines = getFeatureDefines(setup.features);
 	setup.defines.splice(setup.defines.begin(), featureDefines);
 
-	// Windows only has support for the SDL backend, so we hardcode it here (along with winmm)
-	setup.defines.push_back("WIN32");
+	if (projectType == kProjectXcode) {
+		setup.defines.push_back("POSIX");
+		// Define both MACOSX, and IPHONE, but only one of them will be associated to the
+		// correct target by the Xcode project provider.
+		// This define will help catching up target dependend files, like "browser_osx.mm"
+		// The suffix ("_osx", or "_ios") will be used by the project provider to filter out
+		// the files, according to the target.
+		setup.defines.push_back("MACOSX");
+		setup.defines.push_back("IPHONE");
+	} else if (projectType == kProjectMSVC || projectType == kProjectCodeBlocks) {
+		// Windows only has support for the SDL backend, so we hardcode it here (along with winmm)
+		setup.defines.push_back("WIN32");
+	} else {
+		// As a last resort, select the backend files to build based on the platform used to build create_project.
+		// This is broken when cross compiling.
+#if defined(_WIN32) || defined(WIN32)
+		setup.defines.push_back("WIN32");
+#else
+		setup.defines.push_back("POSIX");
+#endif
+	}
+
+	bool updatesEnabled = false, curlEnabled = false, sdlnetEnabled = false;
+	for (FeatureList::const_iterator i = setup.features.begin(); i != setup.features.end(); ++i) {
+		if (i->enable) {
+			if (!strcmp(i->name, "updates"))
+				updatesEnabled = true;
+			else if (!strcmp(i->name, "libcurl"))
+				curlEnabled = true;
+			else if (!strcmp(i->name, "sdlnet"))
+				sdlnetEnabled = true;
+		}
+	}
+
+	if (updatesEnabled) {
+		setup.defines.push_back("USE_SPARKLE");
+		if (projectType != kProjectXcode)
+			setup.libraries.push_back("winsparkle");
+		else
+			setup.libraries.push_back("sparkle");
+	}
+
+	if (curlEnabled && projectType == kProjectMSVC)
+		setup.defines.push_back("CURL_STATICLIB");
+	if (sdlnetEnabled && projectType == kProjectMSVC)
+		setup.libraries.push_back("iphlpapi");
+
 	setup.defines.push_back("SDL_BACKEND");
-	setup.libraries.push_back("sdl");
+	if (!setup.useSDL2) {
+		cout << "\nBuilding against SDL 1.2\n\n";
+		setup.libraries.push_back("sdl");
+	} else {
+		cout << "\nBuilding against SDL 2.0\n\n";
+		// TODO: This also defines USE_SDL2 in the preprocessor, we don't do
+		// this in our configure/make based build system. Adapt create_project
+		// to replicate this behavior.
+		setup.defines.push_back("USE_SDL2");
+		setup.libraries.push_back("sdl2");
+	}
 	setup.libraries.push_back("winmm");
 
 	// Add additional project-specific library
@@ -378,50 +447,25 @@ int main(int argc, char *argv[]) {
 		std::cerr << "ERROR: No project type has been specified!\n";
 		return -1;
 
-	case kProjectCodeBlocks:
-		if (setup.devTools) {
-			std::cerr << "ERROR: Building tools is not supported for the CodeBlocks project type!\n";
+	case kProjectCMake:
+		if (setup.devTools || setup.tests) {
+			std::cerr << "ERROR: Building tools or tests is not supported for the CMake project type!\n";
 			return -1;
 		}
 
-		////////////////////////////////////////////////////////////////////////////
-		// Code::Blocks is using GCC behind the scenes, so we need to pass a list
-		// of options to enable or disable warnings
-		////////////////////////////////////////////////////////////////////////////
-		//
-		// -Wall
-		//   enable all warnings
-		//
-		// -Wno-long-long -Wno-multichar -Wno-unknown-pragmas -Wno-reorder
-		//   disable annoying and not-so-useful warnings
-		//
-		// -Wpointer-arith -Wcast-qual -Wcast-align
-		// -Wshadow -Wimplicit -Wnon-virtual-dtor -Wwrite-strings
-		//   enable even more warnings...
-		//
-		// -fno-rtti -fno-exceptions -fcheck-new
-		//   disable RTTI and exceptions, and enable checking of pointers returned
-		//   by "new"
-		//
-		////////////////////////////////////////////////////////////////////////////
+		addGCCWarnings(globalWarnings);
 
-		globalWarnings.push_back("-Wall");
-		globalWarnings.push_back("-Wno-long-long");
-		globalWarnings.push_back("-Wno-multichar");
-		globalWarnings.push_back("-Wno-unknown-pragmas");
-		globalWarnings.push_back("-Wno-reorder");
-		globalWarnings.push_back("-Wpointer-arith");
-		globalWarnings.push_back("-Wcast-qual");
-		globalWarnings.push_back("-Wcast-align");
-		globalWarnings.push_back("-Wshadow");
-		globalWarnings.push_back("-Wimplicit");
-		globalWarnings.push_back("-Wnon-virtual-dtor");
-		globalWarnings.push_back("-Wwrite-strings");
-		// The following are not warnings at all... We should consider adding them to
-		// a different list of parameters.
-		globalWarnings.push_back("-fno-rtti");
-		globalWarnings.push_back("-fno-exceptions");
-		globalWarnings.push_back("-fcheck-new");
+		provider = new CreateProjectTool::CMakeProvider(globalWarnings, projectWarnings);
+
+		break;
+
+	case kProjectCodeBlocks:
+		if (setup.devTools || setup.tests) {
+			std::cerr << "ERROR: Building tools or tests is not supported for the CodeBlocks project type!\n";
+			return -1;
+		}
+
+		addGCCWarnings(globalWarnings);
 
 		provider = new CreateProjectTool::CodeBlocksProvider(globalWarnings, projectWarnings);
 
@@ -458,6 +502,9 @@ int main(int argc, char *argv[]) {
 		// 4250 ('class1' : inherits 'class2::member' via dominance)
 		//   two or more members have the same name. Should be harmless
 		//
+		// 4267 ('var' : conversion from 'size_t' to 'type', possible loss of data)
+		//   throws tons and tons of warnings (no immediate plan to fix all usages)
+		//
 		// 4310 (cast truncates constant value)
 		//   used in some engines
 		//
@@ -472,6 +519,8 @@ int main(int argc, char *argv[]) {
 		//
 		// 4512 ('class' : assignment operator could not be generated)
 		//   some classes use const items and the default assignment operator cannot be generated
+		//
+		// 4577 ('noexcept' used with no exception handling mode specified)
 		//
 		// 4702 (unreachable code)
 		//   mostly thrown after error() calls (marked as NORETURN)
@@ -499,6 +548,8 @@ int main(int argc, char *argv[]) {
 		//
 		// 4355 ('this' : used in base member initializer list)
 		//   only disabled for specific engines where it is used in a safe way
+		//
+		// 4373 (previous versions of the compiler did not override when parameters only differed by const/volatile qualifiers)
 		//
 		// 4510 ('class' : default constructor could not be generated)
 		//
@@ -528,13 +579,18 @@ int main(int argc, char *argv[]) {
 		globalWarnings.push_back("6385");
 		globalWarnings.push_back("6386");
 
+		if (msvcVersion == 14 || msvcVersion == 15) {
+			globalWarnings.push_back("4267");
+			globalWarnings.push_back("4577");
+		}
+
 		projectWarnings["agi"].push_back("4510");
 		projectWarnings["agi"].push_back("4610");
 
 		projectWarnings["agos"].push_back("4511");
 
 		projectWarnings["dreamweb"].push_back("4355");
-		
+
 		projectWarnings["lure"].push_back("4189");
 		projectWarnings["lure"].push_back("4355");
 
@@ -544,7 +600,9 @@ int main(int argc, char *argv[]) {
 
 		projectWarnings["m4"].push_back("4355");
 
-		if (msvcVersion == 8 || msvcVersion == 9)
+		projectWarnings["sci"].push_back("4373");
+
+		if (msvcVersion == 9)
 			provider = new CreateProjectTool::VisualStudioProvider(globalWarnings, projectWarnings, msvcVersion);
 		else
 			provider = new CreateProjectTool::MSBuildProvider(globalWarnings, projectWarnings, msvcVersion);
@@ -552,8 +610,8 @@ int main(int argc, char *argv[]) {
 		break;
 
 	case kProjectXcode:
-		if (setup.devTools) {
-			std::cerr << "ERROR: Building tools is not supported for the XCode project type!\n";
+		if (setup.devTools || setup.tests) {
+			std::cerr << "ERROR: Building tools or tests is not supported for the XCode project type!\n";
 			return -1;
 		}
 
@@ -575,11 +633,13 @@ int main(int argc, char *argv[]) {
 		globalWarnings.push_back("-Wwrite-strings");
 		// The following are not warnings at all... We should consider adding them to
 		// a different list of parameters.
+#if !NEEDS_RTTI
 		globalWarnings.push_back("-fno-rtti");
+#endif
 		globalWarnings.push_back("-fno-exceptions");
 		globalWarnings.push_back("-fcheck-new");
 
-		provider = new CreateProjectTool::XCodeProvider(globalWarnings, projectWarnings);
+		provider = new CreateProjectTool::XcodeProvider(globalWarnings, projectWarnings);
 		break;
 	}
 
@@ -592,6 +652,11 @@ int main(int argc, char *argv[]) {
 		setup.projectDescription += "Tools";
 	}
 
+	if (setup.tests) {
+		setup.projectName += "-tests";
+		setup.projectDescription += "Tests";
+	}
+
 	provider->createProject(setup);
 
 	delete provider;
@@ -602,14 +667,6 @@ std::string unifyPath(const std::string &path) {
 	std::string result = path;
 	std::replace(result.begin(), result.end(), '\\', '/');
 	return result;
-}
-
-std::string getLastPathComponent(const std::string &path) {
-	std::string::size_type pos = path.find_last_of('/');
-	if (pos == std::string::npos)
-		return path;
-	else
-		return path.substr(pos + 1);
 }
 
 void displayHelp(const char *exe) {
@@ -626,7 +683,8 @@ void displayHelp(const char *exe) {
 	        " Additionally there are the following switches for changing various settings:\n"
 	        "\n"
 	        "Project specific settings:\n"
-	        " --codeblock              build Code::Blocks project files\n"
+	        " --cmake                  build CMake project files\n"
+	        " --codeblocks             build Code::Blocks project files\n"
 	        " --msvc                   build Visual Studio project files\n"
 	        " --xcode                  build XCode project files\n"
 	        " --file-prefix prefix     allow overwriting of relative file prefix in the\n"
@@ -638,28 +696,37 @@ void displayHelp(const char *exe) {
 	        "\n"
 	        "MSVC specific settings:\n"
 	        " --msvc-version version   set the targeted MSVC version. Possible values:\n"
-	        "                           8 stands for \"Visual Studio 2005\"\n"
 	        "                           9 stands for \"Visual Studio 2008\"\n"
 	        "                           10 stands for \"Visual Studio 2010\"\n"
-	        "                           The default is \"9\", thus \"Visual Studio 2008\"\n"
+	        "                           11 stands for \"Visual Studio 2012\"\n"
+	        "                           12 stands for \"Visual Studio 2013\"\n"
+	        "                           14 stands for \"Visual Studio 2015\"\n"
+	        "                           15 stands for \"Visual Studio 2017\"\n"
+	        "                           The default is \"12\", thus \"Visual Studio 2013\"\n"
 	        " --build-events           Run custom build events as part of the build\n"
 	        "                          (default: false)\n"
 	        " --installer              Create NSIS installer after the build (implies --build-events)\n"
 	        "                          (default: false)\n"
-			" --tools                  Create project files for the devtools\n"
-			"                          (ignores --build-events and --installer, as well as engine settings)\n"
-			"                          (default: false)\n"
+	        " --tools                  Create project files for the devtools\n"
+	        "                          (ignores --build-events and --installer, as well as engine settings)\n"
+	        "                          (default: false)\n"
+	        " --tests                  Create project files for the tests\n"
+	        "                          (ignores --build-events and --installer, as well as engine settings)\n"
+	        "                          (default: false)\n"
 	        "\n"
 	        "Engines settings:\n"
 	        " --list-engines           list all available engines and their default state\n"
-	        " --enable-engine          enable building of the engine with the name \"engine\"\n"
-	        " --disable-engine         disable building of the engine with the name \"engine\"\n"
+	        " --enable-engine=<name>   enable building of the engine with the name \"name\"\n"
+	        " --disable-engine=<name>  disable building of the engine with the name \"name\"\n"
 	        " --enable-all-engines     enable building of all engines\n"
 	        " --disable-all-engines    disable building of all engines\n"
 	        "\n"
 	        "Optional features settings:\n"
-	        " --enable-name            enable inclusion of the feature \"name\"\n"
-	        " --disable-name           disable inclusion of the feature \"name\"\n"
+	        " --enable-<name>          enable inclusion of the feature \"name\"\n"
+	        " --disable-<name>         disable inclusion of the feature \"name\"\n"
+	        "\n"
+	        "SDL settings:\n"
+	        " --sdl1                   link to SDL 1.2, instead of SDL 2.0\n"
 	        "\n"
 	        " There are the following features available:\n"
 	        "\n";
@@ -672,48 +739,106 @@ void displayHelp(const char *exe) {
 	cout.setf(std::ios_base::right, std::ios_base::adjustfield);
 }
 
+void addGCCWarnings(StringList &globalWarnings) {
+	////////////////////////////////////////////////////////////////////////////
+	//
+	// -Wall
+	//   enable all warnings
+	//
+	// -Wno-long-long -Wno-multichar -Wno-unknown-pragmas -Wno-reorder
+	//   disable annoying and not-so-useful warnings
+	//
+	// -Wpointer-arith -Wcast-qual -Wcast-align
+	// -Wshadow -Wimplicit -Wnon-virtual-dtor -Wwrite-strings
+	//   enable even more warnings...
+	//
+	// -fno-exceptions -fcheck-new
+	//   disable exceptions, and enable checking of pointers returned by "new"
+	//
+	////////////////////////////////////////////////////////////////////////////
+
+	globalWarnings.push_back("-Wall");
+	globalWarnings.push_back("-Wno-long-long");
+	globalWarnings.push_back("-Wno-multichar");
+	globalWarnings.push_back("-Wno-unknown-pragmas");
+	globalWarnings.push_back("-Wno-reorder");
+	globalWarnings.push_back("-Wpointer-arith");
+	globalWarnings.push_back("-Wcast-qual");
+	globalWarnings.push_back("-Wcast-align");
+	globalWarnings.push_back("-Wshadow");
+	globalWarnings.push_back("-Wnon-virtual-dtor");
+	globalWarnings.push_back("-Wwrite-strings");
+	// The following are not warnings at all... We should consider adding them to
+	// a different list of parameters.
+	globalWarnings.push_back("-fno-exceptions");
+	globalWarnings.push_back("-fcheck-new");
+}
+
 /**
- * Try to parse a given line and create an engine definition
- * out of the result.
+ * Parse the configure.engine file of a given engine directory and return a
+ * list of all defined engines.
  *
- * This may take *any* input line, when the line is not used
- * to define an engine the result of the function will be "false".
- *
- * Note that the contents of "engine" are undefined, when this
- * function returns "false".
- *
- * @param line Text input line.
- * @param engine Reference to an object, where the engine information
- *               is to be stored in.
- * @return "true", when parsing succeeded, "false" otherwise.
+ * @param engineDir The directory of the engine.
+ * @return The list of all defined engines.
  */
-bool parseEngine(const std::string &line, EngineDesc &engine);
+EngineDescList parseEngineConfigure(const std::string &engineDir);
+
+/**
+ * Compares two FSNode entries in a strict-weak fashion based on the name.
+ *
+ * @param left  The first operand.
+ * @param right The second operand.
+ * @return "true" when the name of the left operand is strictly smaller than
+ *         the name of the second operand. "false" otherwise.
+ */
+bool compareFSNode(const CreateProjectTool::FSNode &left, const CreateProjectTool::FSNode &right);
+
+#ifdef FIRST_ENGINE
+/**
+ * Compares two FSNode entries in a strict-weak fashion based on engine name
+ * order.
+ *
+ * @param left  The first operand.
+ * @param right The second operand.
+ * @return "true" when the name of the left operand is strictly smaller than
+ *         the name of the second operand. "false" otherwise.
+ */
+bool compareEngineNames(const CreateProjectTool::FSNode &left, const CreateProjectTool::FSNode &right);
+#endif
 } // End of anonymous namespace
 
-EngineDescList parseConfigure(const std::string &srcDir) {
-	std::string configureFile = srcDir + "/configure";
+EngineDescList parseEngines(const std::string &srcDir) {
+	using CreateProjectTool::FileList;
+	using CreateProjectTool::listDirectory;
 
-	std::ifstream configure(configureFile.c_str());
-	if (!configure)
-		return EngineDescList();
+	EngineDescList engineList;
 
-	std::string line;
-	EngineDescList engines;
+	FileList engineFiles = listDirectory(srcDir + "/engines/");
 
-	for (;;) {
-		std::getline(configure, line);
-		if (configure.eof())
-			break;
+#ifdef FIRST_ENGINE
+	// In case we want to sort an engine to the front of the list we will
+	// use some manual sorting predicate which assures that.
+	engineFiles.sort(&compareEngineNames);
+#else
+	// Otherwise, we simply sort the file list alphabetically this allows
+	// for a nicer order in --list-engines output, for example.
+	engineFiles.sort(&compareFSNode);
+#endif
 
-		if (configure.fail())
-			error("Failed while reading from " + configureFile);
+	for (FileList::const_iterator i = engineFiles.begin(), end = engineFiles.end(); i != end; ++i) {
+		// Each engine requires its own sub directory thus we will skip all
+		// non directory file nodes here.
+		if (!i->isDirectory) {
+			continue;
+		}
 
-		EngineDesc desc;
-		if (parseEngine(line, desc))
-			engines.push_back(desc);
+		// Retrieve all engines defined in this sub directory and add them to
+		// the list of all engines.
+		EngineDescList list = parseEngineConfigure(srcDir + "/engines/" + i->name);
+		engineList.splice(engineList.end(), list);
 	}
 
-	return engines;
+	return engineList;
 }
 
 bool isSubEngine(const std::string &name, const EngineDescList &engines) {
@@ -778,9 +903,24 @@ StringList getEngineDefines(const EngineDescList &engines) {
 }
 
 namespace {
+/**
+ * Try to parse a given line and create an engine definition
+ * out of the result.
+ *
+ * This may take *any* input line, when the line is not used
+ * to define an engine the result of the function will be "false".
+ *
+ * Note that the contents of "engine" are undefined, when this
+ * function returns "false".
+ *
+ * @param line Text input line.
+ * @param engine Reference to an object, where the engine information
+ *               is to be stored in.
+ * @return "true", when parsing succeeded, "false" otherwise.
+ */
 bool parseEngine(const std::string &line, EngineDesc &engine) {
 	// Format:
-	// add_engine engine_name "Readable Description" enable_default ["SubEngineList"]
+	// add_engine engine_name "Readable Description" enable_default ["SubEngineList"] ["base games"] ["dependencies"]
 	TokenList tokens = tokenize(line);
 
 	if (tokens.size() < 4)
@@ -795,11 +935,60 @@ bool parseEngine(const std::string &line, EngineDesc &engine) {
 	engine.name = *token; ++token;
 	engine.desc = *token; ++token;
 	engine.enable = (*token == "yes"); ++token;
-	if (token != tokens.end())
+	if (token != tokens.end()) {
 		engine.subEngines = tokenize(*token);
+		++token;
+		if (token != tokens.end())
+			++token;
+		if (token != tokens.end())
+			engine.requiredFeatures = tokenize(*token);
+	}
 
 	return true;
 }
+
+EngineDescList parseEngineConfigure(const std::string &engineDir) {
+	std::string configureFile = engineDir + "/configure.engine";
+
+	std::ifstream configure(configureFile.c_str());
+	if (!configure)
+		return EngineDescList();
+
+	std::string line;
+	EngineDescList engines;
+
+	for (;;) {
+		std::getline(configure, line);
+		if (configure.eof())
+			break;
+
+		if (configure.fail())
+			error("Failed while reading from " + configureFile);
+
+		EngineDesc desc;
+		if (parseEngine(line, desc))
+			engines.push_back(desc);
+	}
+
+	return engines;
+}
+
+bool compareFSNode(const CreateProjectTool::FSNode &left, const CreateProjectTool::FSNode &right) {
+	return left.name < right.name;
+}
+
+#ifdef FIRST_ENGINE
+bool compareEngineNames(const CreateProjectTool::FSNode &left, const CreateProjectTool::FSNode &right) {
+	if (left.name == FIRST_ENGINE) {
+		return right.name != FIRST_ENGINE;
+	} else if (right.name == FIRST_ENGINE) {
+		return false;
+	} else {
+		return compareFSNode(left, right);
+	}
+}
+#endif
+} // End of anonymous namespace
 
 TokenList tokenize(const std::string &input, char separator) {
 	TokenList result;
@@ -832,33 +1021,43 @@ TokenList tokenize(const std::string &input, char separator) {
 
 	return result;
 }
-} // End of anonymous namespace
 
 namespace {
 const Feature s_features[] = {
 	// Libraries
-	{    "libz",        "USE_ZLIB", "zlib",             true, "zlib (compression) support" },
-	{     "mad",         "USE_MAD", "libmad",           true, "libmad (MP3) support" },
-	{  "vorbis",      "USE_VORBIS", "libvorbisfile_static libvorbis_static libogg_static", true, "Ogg Vorbis support" },
-	{    "flac",        "USE_FLAC", "libFLAC_static",   true, "FLAC support" },
-	{     "png",         "USE_PNG", "libpng",           true, "libpng support" },
-	{  "theora",   "USE_THEORADEC", "libtheora_static", true, "Theora decoding support" },
-	{"freetype",   "USE_FREETYPE2", "freetype",         true, "FreeType support" },
+	{      "libz",        "USE_ZLIB", "zlib",             true,  "zlib (compression) support" },
+	{       "mad",         "USE_MAD", "libmad",           true,  "libmad (MP3) support" },
+	{    "vorbis",      "USE_VORBIS", "libvorbisfile_static libvorbis_static libogg_static", true, "Ogg Vorbis support" },
+	{      "flac",        "USE_FLAC", "libFLAC_static win_utf8_io_static",   true, "FLAC support" },
+	{       "png",         "USE_PNG", "libpng16",         true,  "libpng support" },
+	{      "faad",        "USE_FAAD", "libfaad",          false, "AAC support" },
+	{     "mpeg2",       "USE_MPEG2", "libmpeg2",         false, "MPEG-2 support" },
+	{    "theora",   "USE_THEORADEC", "libtheora_static", true, "Theora decoding support" },
+	{  "freetype",   "USE_FREETYPE2", "freetype",         true, "FreeType support" },
+	{      "jpeg",        "USE_JPEG", "jpeg-static",      true, "libjpeg support" },
+	{"fluidsynth",  "USE_FLUIDSYNTH", "libfluidsynth",    true, "FluidSynth support" },
+	{   "libcurl",     "USE_LIBCURL", "libcurl",          true, "libcurl support" },
+	{    "sdlnet",     "USE_SDL_NET", "SDL_net",          true, "SDL_net support" },
 
 	// Feature flags
-	{        "bink",        "USE_BINK",         "", true, "Bink video support" },
-	{     "scalers",     "USE_SCALERS",         "", true, "Scalers" },
-	{   "hqscalers",  "USE_HQ_SCALERS",         "", true, "HQ scalers" },
-	{       "16bit",   "USE_RGB_COLOR",         "", true, "16bit color support" },
-	{     "mt32emu",     "USE_MT32EMU",         "", true, "integrated MT-32 emulator" },
-	{        "nasm",        "USE_NASM",         "", true, "IA-32 assembly support" }, // This feature is special in the regard, that it needs additional handling.
-	{      "opengl",      "USE_OPENGL", "opengl32", true, "OpenGL support" },
-	{     "taskbar",     "USE_TASKBAR",         "", true, "Taskbar integration support" },
-	{ "translation", "USE_TRANSLATION",         "", true, "Translation support" },
-	{      "vkeybd",   "ENABLE_VKEYBD",         "", false, "Virtual keyboard support"},
-	{   "keymapper","ENABLE_KEYMAPPER",         "", false, "Keymapper support"},
-	{  "langdetect",  "USE_DETECTLANG",         "", true, "System language detection support" } // This feature actually depends on "translation", there
-	                                                                                            // is just no current way of properly detecting this...
+	{            "bink",             "USE_BINK",         "", true,  "Bink video support" },
+	{         "scalers",          "USE_SCALERS",         "", true,  "Scalers" },
+	{       "hqscalers",       "USE_HQ_SCALERS",         "", true,  "HQ scalers" },
+	{           "16bit",        "USE_RGB_COLOR",         "", true,  "16bit color support" },
+	{         "highres",          "USE_HIGHRES",         "", true,  "high resolution" },
+	{         "mt32emu",          "USE_MT32EMU",         "", true,  "integrated MT-32 emulator" },
+	{            "nasm",             "USE_NASM",         "", true,  "IA-32 assembly support" }, // This feature is special in the regard, that it needs additional handling.
+	{          "opengl",           "USE_OPENGL",         "", true,  "OpenGL support" },
+	{        "opengles",             "USE_GLES",         "", true,  "forced OpenGL ES mode" },
+	{         "taskbar",          "USE_TASKBAR",         "", true,  "Taskbar integration support" },
+	{           "cloud",            "USE_CLOUD",         "", true,  "Cloud integration support" },
+	{     "translation",      "USE_TRANSLATION",         "", true,  "Translation support" },
+	{          "vkeybd",        "ENABLE_VKEYBD",         "", false, "Virtual keyboard support"},
+	{       "keymapper",     "ENABLE_KEYMAPPER",         "", false, "Keymapper support"},
+	{   "eventrecorder", "ENABLE_EVENTRECORDER",         "", false, "Event recorder support"},
+	{         "updates",          "USE_UPDATES",         "", false, "Updates support"},
+	{      "langdetect",       "USE_DETECTLANG",         "", true,  "System language detection support" } // This feature actually depends on "translation", there
+	                                                                                                      // is just no current way of properly detecting this...
 };
 
 const Tool s_tools[] = {
@@ -866,7 +1065,9 @@ const Tool s_tools[] = {
 	{ "create_hugo",         true},
 	{ "create_kyradat",      true},
 	{ "create_lure",         true},
+	{ "create_neverhood",    true},
 	{ "create_teenagent",    true},
+	{ "create_tony",         true},
 	{ "create_toon",         true},
 	{ "create_translations", true},
 	{ "qtable",              true}
@@ -952,14 +1153,24 @@ void splitFilename(const std::string &fileName, std::string &name, std::string &
 	ext = (dot == std::string::npos) ? std::string() : fileName.substr(dot + 1);
 }
 
+std::string basename(const std::string &fileName) {
+	const std::string::size_type slash = fileName.find_last_of('/');
+	if (slash == std::string::npos) return fileName;
+	return fileName.substr(slash + 1);
+}
+
 bool producesObjectFile(const std::string &fileName) {
 	std::string n, ext;
 	splitFilename(fileName, n, ext);
 
-	if (ext == "cpp" || ext == "c" || ext == "asm")
+	if (ext == "cpp" || ext == "c" || ext == "asm" || ext == "m" || ext == "mm")
 		return true;
 	else
 		return false;
+}
+
+std::string toString(int num) {
+	return static_cast<std::ostringstream*>(&(std::ostringstream() << num))->str();
 }
 
 /**
@@ -998,7 +1209,7 @@ bool isInList(const std::string &dir, const std::string &fileName, const StringL
 				continue;
 		}
 
-		const std::string lastPathComponent = getLastPathComponent(*i);
+		const std::string lastPathComponent = ProjectProvider::getLastPathComponent(*i);
 		if (extensionName == "o") {
 			return false;
 		} else if (!producesObjectFile(fileName) && extensionName != "h") {
@@ -1039,16 +1250,9 @@ bool compareNodes(const FileNode *l, const FileNode *r) {
 	}
 }
 
-/**
- * Returns a list of all files and directories in the specified
- * path.
- *
- * @param dir Directory which should be listed.
- * @return List of all children.
- */
 FileList listDirectory(const std::string &dir) {
 	FileList result;
-#ifdef USE_WIN32_API
+#if defined(_WIN32) || defined(WIN32)
 	WIN32_FIND_DATA fileInformation;
 	HANDLE fileHandle = FindFirstFile((dir + "/*").c_str(), &fileInformation);
 
@@ -1084,6 +1288,32 @@ FileList listDirectory(const std::string &dir) {
 	closedir(dirp);
 #endif
 	return result;
+}
+
+void createDirectory(const std::string &dir) {
+#if defined(_WIN32) || defined(WIN32)
+	if (!CreateDirectory(dir.c_str(), NULL)) {
+		if (GetLastError() != ERROR_ALREADY_EXISTS) {
+			error("Could not create folder \"" + dir + "\"");
+		}
+	}
+#else
+	if (mkdir(dir.c_str(), 0777) == -1) {
+		if (errno == EEXIST) {
+			// Try to open as a folder (might be a file / symbolic link)
+			DIR *dirp = opendir(dir.c_str());
+			if (dirp == NULL) {
+				error("Could not create folder \"" + dir + "\"");
+			} else {
+				// The folder exists, just close the stream and return
+				closedir(dirp);
+			}
+		} else {
+			error("Could not create folder \"" + dir + "\"");
+		}
+	}
+#endif
+
 }
 
 /**
@@ -1151,80 +1381,76 @@ ProjectProvider::ProjectProvider(StringList &global_warnings, std::map<std::stri
 	: _version(version), _globalWarnings(global_warnings), _projectWarnings(project_warnings) {
 }
 
-void ProjectProvider::createProject(const BuildSetup &setup) {
+void ProjectProvider::createProject(BuildSetup &setup) {
+	std::string targetFolder;
+
 	if (setup.devTools) {
 		_uuidMap = createToolsUUIDMap();
-
-		// We also need to add the UUID of the main project file.
-		const std::string svmUUID = _uuidMap[setup.projectName] = createUUID();
-
-		createWorkspace(setup);
-
-		StringList in, ex;
-
-		// Create tools project files
-		for (UUIDMap::const_iterator i = _uuidMap.begin(); i != _uuidMap.end(); ++i) {
-			if (i->first == setup.projectName)
-				continue;
-
-			in.clear(); ex.clear();
-			const std::string moduleDir = setup.srcDir + "/devtools/" + i->first;
-
-			createModuleList(moduleDir, setup.defines, in, ex);
-			createProjectFile(i->first, i->second, setup, moduleDir, in, ex);
-		}
-
-		// Create other misc. build files
-		createOtherBuildFiles(setup);
-
-	} else {
+		targetFolder = "/devtools/";
+	} else if (!setup.tests) {
 		_uuidMap = createUUIDMap(setup);
+		targetFolder = "/engines/";
+	}
 
-		// We also need to add the UUID of the main project file.
-		const std::string svmUUID = _uuidMap[setup.projectName] = createUUID();
+	// We also need to add the UUID of the main project file.
+	const std::string svmUUID = _uuidMap[setup.projectName] = createUUID();
 
-		// Create Solution/Workspace file
-		createWorkspace(setup);
+	createWorkspace(setup);
 
-		StringList in, ex;
+	StringList in, ex;
 
-		// Create engine project files
-		for (UUIDMap::const_iterator i = _uuidMap.begin(); i != _uuidMap.end(); ++i) {
-			if (i->first == setup.projectName)
-				continue;
-
-			in.clear(); ex.clear();
-			const std::string moduleDir = setup.srcDir + "/engines/" + i->first;
-
-			createModuleList(moduleDir, setup.defines, in, ex);
-			createProjectFile(i->first, i->second, setup, moduleDir, in, ex);
-		}
-
-		// Last but not least create the main project file.
+	// Create project files
+	for (UUIDMap::const_iterator i = _uuidMap.begin(); i != _uuidMap.end(); ++i) {
+		if (i->first == setup.projectName)
+			continue;
+		// Retain the files between engines if we're creating a single project
 		in.clear(); ex.clear();
 
+		const std::string moduleDir = setup.srcDir + targetFolder + i->first;
+
+		createModuleList(moduleDir, setup.defines, setup.testDirs, in, ex);
+		createProjectFile(i->first, i->second, setup, moduleDir, in, ex);
+	}
+
+	if (setup.tests) {
+		// Create the main project file.
+		in.clear(); ex.clear();
+		createModuleList(setup.srcDir + "/backends", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/base", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/common", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/engines", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/graphics", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/gui", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/audio", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/test", setup.defines, setup.testDirs, in, ex);
+
+		createProjectFile(setup.projectName, svmUUID, setup, setup.srcDir, in, ex);
+	} else if (!setup.devTools) {
+		// Last but not least create the main project file.
+		in.clear(); ex.clear();
 		// File list for the Project file
-		createModuleList(setup.srcDir + "/backends", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/base", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/common", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/engines", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/graphics", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/gui", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/audio", setup.defines, in, ex);
-		createModuleList(setup.srcDir + "/audio/softsynth/mt32", setup.defines, in, ex);
-#if HAS_VIDEO_FOLDER
-		createModuleList(setup.srcDir + "/video", setup.defines, in, ex);
-#endif
+		createModuleList(setup.srcDir + "/backends", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/backends/platform/sdl", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/base", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/common", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/engines", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/graphics", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/gui", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/audio", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/audio/softsynth/mt32", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/video", setup.defines, setup.testDirs, in, ex);
+		createModuleList(setup.srcDir + "/image", setup.defines, setup.testDirs, in, ex);
 
 		// Resource files
-		in.push_back(setup.srcDir + "/icons/" + setup.projectName + ".ico");
-		in.push_back(setup.srcDir + "/dists/" + setup.projectName + ".rc");
+		addResourceFiles(setup, in, ex);
 
 		// Various text files
 		in.push_back(setup.srcDir + "/AUTHORS");
 		in.push_back(setup.srcDir + "/COPYING");
 		in.push_back(setup.srcDir + "/COPYING.LGPL");
+		in.push_back(setup.srcDir + "/COPYING.BSD");
+		in.push_back(setup.srcDir + "/COPYING.FREEFONT");
 		in.push_back(setup.srcDir + "/COPYRIGHT");
 		in.push_back(setup.srcDir + "/NEWS");
 		in.push_back(setup.srcDir + "/README");
@@ -1232,9 +1458,15 @@ void ProjectProvider::createProject(const BuildSetup &setup) {
 
 		// Create the main project file.
 		createProjectFile(setup.projectName, svmUUID, setup, setup.srcDir, in, ex);
+	}
 
-		// Create other misc. build files
-		createOtherBuildFiles(setup);
+	// Create other misc. build files
+	createOtherBuildFiles(setup);
+
+	// In case we create the main ScummVM project files we will need to
+	// generate engines/plugins_table.h too.
+	if (!setup.tests && !setup.devTools) {
+		createEnginePluginsTable(setup);
 	}
 }
 
@@ -1301,6 +1533,14 @@ std::string ProjectProvider::createUUID() const {
 #endif
 }
 
+std::string ProjectProvider::getLastPathComponent(const std::string &path) {
+	std::string::size_type pos = path.find_last_of('/');
+	if (pos == std::string::npos)
+		return path;
+	else
+		return path.substr(pos + 1);
+}
+
 void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &projectFile,
                                         const StringList &includeList, const StringList &excludeList,
                                         const std::string &filePrefix) {
@@ -1308,7 +1548,8 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 	StringList duplicate;
 
 	for (StringList::const_iterator i = includeList.begin(); i != includeList.end(); ++i) {
-		const std::string fileName = getLastPathComponent(*i);
+		std::string fileName = getLastPathComponent(*i);
+		std::transform(fileName.begin(), fileName.end(), fileName.begin(), tolower);
 
 		// Leave out non object file names.
 		if (fileName.size() < 2 || fileName.compare(fileName.size() - 2, 2, ".o"))
@@ -1321,7 +1562,9 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 		// Search for duplicates
 		StringList::const_iterator j = i; ++j;
 		for (; j != includeList.end(); ++j) {
-			if (fileName == getLastPathComponent(*j)) {
+			std::string candidateFileName = getLastPathComponent(*j);
+			std::transform(candidateFileName.begin(), candidateFileName.end(), candidateFileName.begin(), tolower);
+			if (fileName == candidateFileName) {
 				duplicate.push_back(fileName);
 				break;
 			}
@@ -1335,7 +1578,7 @@ void ProjectProvider::addFilesToProject(const std::string &dir, std::ofstream &p
 	delete files;
 }
 
-void ProjectProvider::createModuleList(const std::string &moduleDir, const StringList &defines, StringList &includeList, StringList &excludeList) const {
+void ProjectProvider::createModuleList(const std::string &moduleDir, const StringList &defines, StringList &testDirs, StringList &includeList, StringList &excludeList) const {
 	const std::string moduleMkFile = moduleDir + "/module.mk";
 	std::ifstream moduleMk(moduleMkFile.c_str());
 	if (!moduleMk)
@@ -1466,6 +1709,59 @@ void ProjectProvider::createModuleList(const std::string &moduleDir, const Strin
 					++i;
 				}
 			}
+		} else if (*i == "TESTS") {
+			if (tokens.size() < 3)
+				error("Malformed TESTS definition in " + moduleMkFile);
+			++i;
+
+			if (*i != ":=" && *i != "+=" && *i != "=")
+				error("Malformed TESTS definition in " + moduleMkFile);
+			++i;
+
+			while (i != tokens.end()) {
+				// Read input
+				std::string folder = unifyPath(*i);
+
+				// Get include folder
+				const std::string source_dir = "$(srcdir)/";
+				const std::string selector = getLastPathComponent(folder);
+				const std::string module = getLastPathComponent(moduleDir);
+
+				folder.replace(folder.find(source_dir), source_dir.length(), "");
+				folder.replace(folder.find(selector), selector.length(), "");
+				folder.replace(folder.find(module), module.length(), moduleDir);
+
+				// Scan all files in the include folder
+				FileList files = listDirectory(folder);
+
+				if (files.empty())
+					continue;
+
+				// Add to list of test folders
+				testDirs.push_back(folder);
+
+				for (FileList::const_iterator f = files.begin(); f != files.end(); ++f) {
+					if (f->isDirectory)
+						continue;
+
+					std::string filename = folder + f->name;
+
+					if (shouldInclude.top()) {
+						// In case we should include a file, we need to make
+						// sure it is not in the exclude list already. If it
+						// is we just drop it from the exclude list.
+						excludeList.remove(filename);
+
+						includeList.push_back(filename);
+					} else if (std::find(includeList.begin(), includeList.end(), filename) == includeList.end()) {
+						// We only add the file to the exclude list in case it
+						// has not yet been added to the include list.
+						excludeList.push_back(filename);
+					}
+				}
+
+				++i;
+			}
 		} else if (*i == "ifdef") {
 			if (tokens.size() < 2)
 				error("Malformed ifdef in " + moduleMkFile);
@@ -1502,6 +1798,37 @@ void ProjectProvider::createModuleList(const std::string &moduleDir, const Strin
 		error("Malformed file " + moduleMkFile);
 }
 
+void ProjectProvider::createEnginePluginsTable(const BuildSetup &setup) {
+	// First we need to create the "engines" directory.
+	createDirectory(setup.outputDir + "/engines");
+
+	// Then, we can generate the actual "plugins_table.h" file.
+	const std::string enginePluginsTableFile = setup.outputDir + "/engines/plugins_table.h";
+	std::ofstream enginePluginsTable(enginePluginsTableFile.c_str());
+	if (!enginePluginsTable) {
+		error("Could not open \"" + enginePluginsTableFile + "\" for writing");
+	}
+
+	enginePluginsTable << "/* This file is automatically generated by create_project */\n"
+	                   << "/* DO NOT EDIT MANUALLY */\n"
+	                   << "// This file is being included by \"base/plugins.cpp\"\n";
+
+	for (EngineDescList::const_iterator i = setup.engines.begin(), end = setup.engines.end(); i != end; ++i) {
+		// We ignore all sub engines here because they require no special
+		// handling.
+		if (isSubEngine(i->name, setup.engines)) {
+			continue;
+		}
+
+		// Make the engine name all uppercase.
+		std::string engineName;
+		std::transform(i->name.begin(), i->name.end(), std::back_inserter(engineName), toupper);
+
+		enginePluginsTable << "#if PLUGIN_ENABLED_STATIC(" << engineName << ")\n"
+		                   << "LINK_PLUGIN(" << engineName << ")\n"
+		                   << "#endif\n";
+	}
+}
 } // End of anonymous namespace
 
 void error(const std::string &message) {

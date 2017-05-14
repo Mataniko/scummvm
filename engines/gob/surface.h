@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,9 +26,6 @@
 #include "common/scummsys.h"
 #include "common/ptr.h"
 #include "common/rational.h"
-#include "common/iff_container.h"
-
-#include "graphics/iff.h"
 
 namespace Common {
 class SeekableReadStream;
@@ -39,35 +36,10 @@ namespace Gob {
 enum ImageType {
 	kImageTypeNone = -1,
 	kImageTypeTGA  =  0,
-	kImageTypeLBM,
+	kImageTypeIFF,
 	kImageTypeBRC,
 	kImageTypeBMP,
 	kImageTypeJPEG
-};
-
-class LBMLoader {
-public:
-	LBMLoader(Common::SeekableReadStream &stream);
-
-	bool loadHeader (Graphics::BMHD &header);
-	bool loadPalette(byte *palette);
-	bool loadImage  (byte *image);
-
-private:
-	Common::IFFParser _parser;
-
-	bool _hasHeader;
-
-	Graphics::ILBMDecoder _decoder;
-
-	byte *_palette;
-	byte *_image;
-
-	bool callbackHeader (Common::IFFChunk &chunk);
-	bool callbackPalette(Common::IFFChunk &chunk);
-	bool callbackImage  (Common::IFFChunk &chunk);
-
-	bool readHeader();
 };
 
 /** An iterator over a surface's image data, automatically handles different color depths. */
@@ -122,6 +94,7 @@ private:
 class Surface {
 public:
 	Surface(uint16 width, uint16 height, uint8 bpp, byte *vidMem = 0);
+	Surface(uint16 width, uint16 height, uint8 bpp, const byte *vidMem);
 	~Surface();
 
 	uint16 getWidth () const;
@@ -148,15 +121,18 @@ public:
 	void blitScaled(const Surface &from, int16 x, int16 y, Common::Rational scale, int32 transp = -1);
 	void blitScaled(const Surface &from, Common::Rational scale, int32 transp = -1);
 
-	void fillRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uint32 color);
+	void fillRect(int16 left, int16 top, int16 right, int16 bottom, uint32 color);
 	void fill(uint32 color);
 	void clear();
 
 	void shadeRect(uint16 left, uint16 top, uint16 right, uint16 bottom,
 			uint32 color, uint8 strength);
 
+	void recolor(uint8 from, uint8 to);
+
 	void putPixel(uint16 x, uint16 y, uint32 color);
 	void drawLine(uint16 x0, uint16 y0, uint16 x1, uint16 y1, uint32 color);
+	void drawRect(uint16 left, uint16 top, uint16 right, uint16 bottom, uint32 color);
 	void drawCircle(uint16 x0, uint16 y0, uint16 radius, uint32 color, int16 pattern = 0);
 
 	void blitToScreen(uint16 left, uint16 top, uint16 right, uint16 bottom, uint16 x, uint16 y) const;
@@ -178,7 +154,7 @@ private:
 	                         uint16 dWidth, uint16 dHeight, uint16 sWidth, uint16 sHeight);
 
 	bool loadTGA (Common::SeekableReadStream &stream);
-	bool loadLBM (Common::SeekableReadStream &stream);
+	bool loadIFF (Common::SeekableReadStream &stream);
 	bool loadBRC (Common::SeekableReadStream &stream);
 	bool loadBMP (Common::SeekableReadStream &stream);
 	bool loadJPEG(Common::SeekableReadStream &stream);

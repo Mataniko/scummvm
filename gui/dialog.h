@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #ifndef GUI_DIALOG_H
@@ -37,6 +38,8 @@ struct Event;
 
 namespace GUI {
 
+class EventRecorder;
+
 class Widget;
 
 // Some "common" commands sent to handleCommand()
@@ -47,11 +50,13 @@ enum {
 
 class Dialog : public GuiObject {
 	friend class GuiManager;
+	friend class EventRecorder;
 	friend class Tooltip;
 protected:
 	Widget	*_mouseWidget;
 	Widget  *_focusedWidget;
 	Widget  *_dragWidget;
+	Widget 	*_tickleWidget;
 	bool	_visible;
 
 	ThemeEngine::DialogBackground _backgroundType;
@@ -71,7 +76,13 @@ public:
 	void	setFocusWidget(Widget *widget);
 	Widget *getFocusWidget() { return _focusedWidget; }
 
+	void setTickleWidget(Widget *widget) { _tickleWidget = widget; }
+	void unSetTickleWidget() { _tickleWidget = NULL; }
+	Widget *getTickleWidget() { return _tickleWidget; }
+
 	virtual void reflowLayout();
+	virtual void lostFocus();
+	virtual void receivedFocus(int x = -1, int y = -1) { if (x >= 0 && y >= 0) handleMouseMoved(x, y, 0); }
 
 protected:
 	virtual void open();

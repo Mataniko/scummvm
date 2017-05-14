@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -47,10 +47,7 @@
 #include "lastexpress/menu/menu.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
-#include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
 
@@ -88,16 +85,6 @@ Logic::~Logic() {
 //////////////////////////////////////////////////////////////////////////
 // Event Handling
 //////////////////////////////////////////////////////////////////////////
-#define REDRAW_CURSOR() { \
-	if (getInventory()->isMagnifierInUse()) \
-		_engine->getCursor()->setStyle(kCursorMagnifier); \
-	if (getInventory()->isPortraitHighlighted() \
-	|| getInventory()->isOpened() \
-	|| getInventory()->isEggHighlighted()) \
-		_engine->getCursor()->setStyle(kCursorNormal); \
-	return; \
-}
-
 void Logic::eventMouse(const Common::Event &ev) {
 	bool hotspotHandled = false;
 
@@ -168,7 +155,9 @@ void Logic::eventMouse(const Common::Event &ev) {
 				getInventory()->unselectItem();
 		}
 
-		REDRAW_CURSOR()
+		redrawCursor();
+
+		return;
 	}
 
 	// Handle match case
@@ -194,7 +183,9 @@ void Logic::eventMouse(const Common::Event &ev) {
 			getScenes()->processScene();
 		}
 
-		REDRAW_CURSOR()
+		redrawCursor();
+
+		return;
 	}
 
 	// Handle entity item case
@@ -315,7 +306,7 @@ void Logic::eventTick(const Common::Event &) {
 	//////////////////////////////////////////////////////////////////////////
 	// Draw the blinking egg if needed
 	if (getGlobalTimer() && !getFlags()->shouldDrawEggOrHourGlass)
-		getInventory()->drawBlinkingEgg();
+		getInventory()->drawBlinkingEgg(ticks);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Adjust time and save game if needed
@@ -411,16 +402,19 @@ void Logic::eventTick(const Common::Event &) {
  * Resets the game state.
  */
 void Logic::resetState() {
-	getState()->scene = kSceneDefault;
+	getScenes()->setCoordinates(Common::Rect(80, 0, 559, 479));
 
-	warning("[Logic::resetState] Not implemented! You need to restart the engine until this is implemented.");
+	SAFE_DELETE(_entities);
+	_entities = new Entities(_engine);
+
+	_state->reset();
 }
 
 /**
  * Handle game over
  *
- * @param type 		 The savegame type.
- * @param value 	 The value (event, time, index, ...)
+ * @param type       The savegame type.
+ * @param value      The value (event, time, index, ...)
  * @param sceneIndex Index of the scene to show.
  * @param showScene  true to show a scene, false to return to menu directly
  */
@@ -474,7 +468,7 @@ void Logic::switchChapter() const {
 
 	case kChapter3:
 		getInventory()->get(kItemFirebird)->location = kObjectLocation4;
-		getInventory()->get(kItemFirebird)->isPresent = false;
+		getInventory()->get(kItemFirebird)->inPocket = false;
 		getInventory()->get(kItem11)->location = kObjectLocation1;
 		getInventory()->addItem(kItemWhistle);
 		getInventory()->addItem(kItemKey);
@@ -593,6 +587,16 @@ void Logic::updateCursor(bool) const { /* the cursor is always updated, even whe
 		style = kCursorNormal;
 
 	_engine->getCursor()->setStyle(style);
+}
+
+void Logic::redrawCursor() const {
+	if (getInventory()->isMagnifierInUse())
+		_engine->getCursor()->setStyle(kCursorMagnifier);
+
+	if (getInventory()->isPortraitHighlighted()
+	 || getInventory()->isOpened()
+	 || getInventory()->isEggHighlighted())
+		_engine->getCursor()->setStyle(kCursorNormal);
 }
 
 } // End of namespace LastExpress

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,7 +32,6 @@
 #include "common/debug.h"
 #include "common/rect.h"
 #include "common/stream.h"
-#include "common/textconsole.h"
 
 namespace LastExpress {
 
@@ -151,7 +150,7 @@ SubtitleManager::~SubtitleManager() {
 }
 
 void SubtitleManager::reset() {
-	for (int i = 0; i < (int)_subtitles.size(); i++)
+	for (uint i = 0; i < _subtitles.size(); i++)
 		delete _subtitles[i];
 
 	_subtitles.clear();
@@ -211,10 +210,10 @@ void SubtitleManager::setTime(uint16 time) {
 	_currentIndex = -1;
 
 	// Find the appropriate line to show
-	for (int16 i = 0; i < (int16)_subtitles.size(); i++) {
+	for (uint i = 0; i < _subtitles.size(); i++) {
 		if ((time >= _subtitles[i]->getTimeStart()) && (time <= _subtitles[i]->getTimeStop())) {
 			// Keep the index of the line to show
-			_currentIndex = i;
+			_currentIndex = (int16)i;
 			return;
 		}
 	}
@@ -238,7 +237,7 @@ Common::Rect SubtitleManager::draw(Graphics::Surface *surface) {
 
 	// Draw the current line
 	assert(_currentIndex >= 0 && _currentIndex < (int16)_subtitles.size());
-	return _subtitles[_currentIndex]->draw(surface, _font);
+	return _subtitles[(uint16)_currentIndex]->draw(surface, _font);
 }
 
 } // End of namespace LastExpress

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -27,9 +27,13 @@
 #include "common/debug-channels.h"
 #include "common/config-manager.h"
 #include "common/textconsole.h"
+#include "common/translation.h"
 
 #include "hugo/hugo.h"
+#include "hugo/console.h"
+#include "hugo/dialogs.h"
 #include "hugo/file.h"
+#include "hugo/game.h"
 #include "hugo/schedule.h"
 #include "hugo/display.h"
 #include "hugo/mouse.h"
@@ -46,11 +50,11 @@
 
 namespace Hugo {
 
-HugoEngine *HugoEngine::s_Engine = 0;
+HugoEngine *HugoEngine::s_Engine = nullptr;
 
 HugoEngine::HugoEngine(OSystem *syst, const HugoGameDescription *gd) : Engine(syst), _gameDescription(gd),
-	_hero(0), _heroImage(0), _defltTunes(0), _numScreens(0), _tunesNbr(0), _soundSilence(0), _soundTest(0),
-	_screenStates(0), _numStates(0), _score(0), _maxscore(0), _lastTime(0), _curTime(0), _episode(0)
+	_hero(nullptr), _heroImage(0), _defltTunes(nullptr), _numScreens(0), _tunesNbr(0), _soundSilence(0), _soundTest(0),
+	_screenStates(nullptr), _numStates(0), _score(0), _maxscore(0), _lastTime(0), _curTime(0), _episode(nullptr)
 {
 	_system = syst;
 	DebugMan.addDebugChannel(kDebugSchedule, "Schedule", "Script Schedule debug level");
@@ -66,6 +70,53 @@ HugoEngine::HugoEngine(OSystem *syst, const HugoGameDescription *gd) : Engine(sy
 
 	_console = new HugoConsole(this);
 	_rnd = 0;
+
+	_screen = nullptr;
+	_mouse = nullptr;
+	_inventory = nullptr;
+	_parser = nullptr;
+	_route = nullptr;
+	_sound = nullptr;
+	_intro = nullptr;
+	_object = nullptr;
+	_text = nullptr;
+	_topMenu = nullptr;
+	_status._storyModeFl = false;
+	_status._gameOverFl = false;
+	_status._lookFl = false;
+	_status._recallFl = false;
+	_status._newScreenFl = false;
+	_status._godModeFl = false;
+	_status._showBoundariesFl = false;
+	_status._doQuitFl = false;
+	_status._skipIntroFl = false;
+	_status._helpFl = false;
+	_status._tick = 0;
+	_status._viewState = kViewIntroInit;
+	_status._song = 0;
+	_gameType = kGameTypeNone;
+	_platform = Common::kPlatformUnknown;
+	_packedFl = false;
+
+	_numVariant = 0;
+	_gameVariant = kGameVariantNone;
+	_normalTPS = 0;
+	_screenPtr = nullptr;
+	_config._musicFl = true;
+	_config._soundFl = true;
+	_config._turboFl = false;
+	_look = 0;
+	_take = 0;
+	_drop = 0;
+	_maze._enabledFl = false;
+	_maze._size = 0;
+	_maze._x1 = _maze._y1 = _maze._x2 = _maze._y2 = _maze._x3 = _maze._x4 = 0;
+	_maze._firstScreenIndex = 0;
+	_boot._checksum = 0;
+	_boot._registered = kRegShareware;
+	_boot._exitLen = 0;
+	_file = nullptr;
+	_scheduler = nullptr;
 }
 
 HugoEngine::~HugoEngine() {
@@ -106,7 +157,7 @@ GUI::Debugger *HugoEngine::getDebugger() {
 	return _console;
 }
 
-status_t &HugoEngine::getGameStatus() {
+Status &HugoEngine::getGameStatus() {
 	return _status;
 }
 
@@ -249,24 +300,24 @@ Common::Error HugoEngine::run() {
 
 	initStatus();                                   // Initialize game status
 	initConfig();                                   // Initialize user's config
-	if (!_status.doQuitFl) {
+	if (!_status._doQuitFl) {
 		initialize();
 		resetConfig();                              // Reset user's config
 		initMachine();
 
 		// Start the state machine
-		_status.viewState = kViewIntroInit;
+		_status._viewState = kViewIntroInit;
 
 		int16 loadSlot = Common::ConfigManager::instance().getInt("save_slot");
 		if (loadSlot >= 0) {
-			_status.skipIntroFl = true;
+			_status._skipIntroFl = true;
 			_file->restoreGame(loadSlot);
 		} else {
 			_file->saveGame(0, "New Game");
 		}
 	}
 
-	while (!_status.doQuitFl) {
+	while (!_status._doQuitFl) {
 		_screen->drawBoundaries();
 		g_system->updateScreen();
 		runMachine();
@@ -289,20 +340,20 @@ Common::Error HugoEngine::run() {
 				_mouse->setRightButton();
 				break;
 			case Common::EVENT_QUIT:
-				_status.doQuitFl = true;
+				_status._doQuitFl = true;
 				break;
 			default:
 				break;
 			}
 		}
-		if (_status.helpFl) {
-			_status.helpFl = false;
+		if (_status._helpFl) {
+			_status._helpFl = false;
 			_file->instructions();
 		}
 
 		_mouse->mouseHandler();                     // Mouse activity - adds to display list
 		_screen->displayList(kDisplayDisplay);      // Blit the display list to screen
-		_status.doQuitFl |= shouldQuit();           // update game quit flag
+		_status._doQuitFl |= shouldQuit();           // update game quit flag
 	}
 	return Common::kNoError;
 }
@@ -323,10 +374,10 @@ void HugoEngine::initMachine() {
  * Hugo game state machine - called during onIdle
  */
 void HugoEngine::runMachine() {
-	status_t &gameStatus = getGameStatus();
+	Status &gameStatus = getGameStatus();
 
 	// Don't process if gameover
-	if (gameStatus.gameOverFl)
+	if (gameStatus._gameOverFl)
 		return;
 
 	_curTime = g_system->getMillis();
@@ -338,19 +389,19 @@ void HugoEngine::runMachine() {
 
 	_lastTime = _curTime;
 
-	switch (gameStatus.viewState) {
+	switch (gameStatus._viewState) {
 	case kViewIdle:                                 // Not processing state machine
 		_screen->hideCursor();
 		_intro->preNewGame();                       // Any processing before New Game selected
 		break;
 	case kViewIntroInit:                            // Initialization before intro begins
 		_intro->introInit();
-		gameStatus.viewState = kViewIntro;
+		gameStatus._viewState = kViewIntro;
 		break;
 	case kViewIntro:                                // Do any game-dependant preamble
 		if (_intro->introPlay()) {                  // Process intro screen
 			_scheduler->newScreen(0);               // Initialize first screen
-			gameStatus.viewState = kViewPlay;
+			gameStatus._viewState = kViewPlay;
 		}
 		break;
 	case kViewPlay:                                 // Playing game
@@ -368,8 +419,8 @@ void HugoEngine::runMachine() {
 		_inventory->runInventory();                 // Process Inventory state machine
 		break;
 	case kViewExit:                                 // Game over or user exited
-		gameStatus.viewState = kViewIdle;
-		_status.doQuitFl = true;
+		gameStatus._viewState = kViewIdle;
+		_status._doQuitFl = true;
 		break;
 	}
 }
@@ -379,10 +430,11 @@ void HugoEngine::runMachine() {
  */
 bool HugoEngine::loadHugoDat() {
 	Common::File in;
-	in.open("hugo.dat");
+	Common::String filename = "hugo.dat";
+	in.open(filename.c_str());
 
 	if (!in.isOpen()) {
-		Common::String errorMessage = "You're missing the 'hugo.dat' file. Get it from the ScummVM website";
+		Common::String errorMessage = Common::String::format(_("Unable to locate the '%s' engine data file."), filename.c_str());
 		GUIErrorMessage(errorMessage);
 		warning("%s", errorMessage.c_str());
 		return false;
@@ -393,7 +445,7 @@ bool HugoEngine::loadHugoDat() {
 	in.read(buf, 4);
 
 	if (memcmp(buf, "HUGO", 4)) {
-		Common::String errorMessage = "File 'hugo.dat' is corrupt. Get it from the ScummVM website";
+		Common::String errorMessage = Common::String::format(_("The '%s' engine data file is corrupt."), filename.c_str());
 		GUIErrorMessage(errorMessage);
 		return false;
 	}
@@ -402,7 +454,9 @@ bool HugoEngine::loadHugoDat() {
 	int minVer = in.readByte();
 
 	if ((majVer != HUGO_DAT_VER_MAJ) || (minVer != HUGO_DAT_VER_MIN)) {
-		Common::String errorMessage = Common::String::format("File 'hugo.dat' is wrong version. Expected %d.%d but got %d.%d. Get it from the ScummVM website", HUGO_DAT_VER_MAJ, HUGO_DAT_VER_MIN, majVer, minVer);
+		Common::String errorMessage = Common::String::format(
+			_("Incorrect version of the '%s' engine data file found. Expected %d.%d but got %d.%d."),
+			filename.c_str(),HUGO_DAT_VER_MAJ, HUGO_DAT_VER_MIN, majVer, minVer);
 		GUIErrorMessage(errorMessage);
 		return false;
 	}
@@ -427,7 +481,7 @@ bool HugoEngine::loadHugoDat() {
 	_scheduler->loadActListArr(in);
 	_scheduler->loadAlNewscrIndex(in);
 	_hero = &_object->_objects[kHeroIndex];         // This always points to hero
-	_screen_p = &(_object->_objects[kHeroIndex].screenIndex); // Current screen is hero's
+	_screenPtr = &(_object->_objects[kHeroIndex]._screenIndex); // Current screen is hero's
 	_heroImage = kHeroIndex;                        // Current in use hero image
 
 	for (int varnt = 0; varnt < _numVariant; varnt++) {
@@ -527,33 +581,20 @@ void HugoEngine::initPlaylist(bool playlist[kMaxTunes]) {
  */
 void HugoEngine::initStatus() {
 	debugC(1, kDebugEngine, "initStatus");
-	_status.storyModeFl      = false;               // Not in story mode
-	_status.gameOverFl       = false;               // Hero not knobbled yet
-	_status.lookFl           = false;               // Toolbar "look" button
-	_status.recallFl         = false;               // Toolbar "recall" button
-	_status.newScreenFl      = false;               // Screen not just loaded
-	_status.godModeFl        = false;               // No special cheats allowed
-	_status.showBoundariesFl = false;               // Boundaries hidden by default
-	_status.doQuitFl         = false;
-	_status.skipIntroFl      = false;
-	_status.helpFl           = false;
+	_status._storyModeFl      = false;               // Not in story mode
+	_status._gameOverFl       = false;               // Hero not knobbled yet
+	_status._lookFl           = false;               // Toolbar "look" button
+	_status._recallFl         = false;               // Toolbar "recall" button
+	_status._newScreenFl      = false;               // Screen not just loaded
+	_status._godModeFl        = false;               // No special cheats allowed
+	_status._showBoundariesFl = false;               // Boundaries hidden by default
+	_status._doQuitFl         = false;
+	_status._skipIntroFl      = false;
+	_status._helpFl           = false;
 
 	// Initialize every start of new game
-	_status.tick            = 0;                    // Tick count
-	_status.viewState       = kViewIdle;            // View state
-
-// Strangerke - Suppress as related to playback
-//	_status.recordFl      = false;                  // Not record mode
-//	_status.playbackFl    = false;                  // Not playback mode
-// Strangerke - Not used ?
-//	_status.mmtime        = false;                  // Multimedia timer support
-//	_status.helpFl        = false;                  // Not calling WinHelp()
-//	_status.demoFl        = false;                  // Not demo mode
-//	_status.path[0]       = 0;                      // Path to write files
-//	_status.screenWidth   = 0;                      // Desktop screen width
-//	_status.saveTick      = 0;                      // Time of last save
-//	_status.saveSlot      = 0;                      // Slot to save/restore game
-//	_status.textBoxFl     = false;                  // Not processing a text box
+	_status._tick            = 0;                    // Tick count
+	_status._viewState       = kViewIdle;            // View state
 }
 
 /**
@@ -562,11 +603,11 @@ void HugoEngine::initStatus() {
 void HugoEngine::initConfig() {
 	debugC(1, kDebugEngine, "initConfig()");
 
-	_config.musicFl = true;                            // Music state initially on
-	_config.soundFl = true;                            // Sound state initially on
-	_config.turboFl = false;                           // Turbo state initially off
-	initPlaylist(_config.playlist);                    // Initialize default tune playlist
-	_file->readBootFile();                             // Read startup structure
+	_config._musicFl = true;                            // Music state initially on
+	_config._soundFl = true;                            // Sound state initially on
+	_config._turboFl = false;                           // Turbo state initially off
+	initPlaylist(_config._playlist);                    // Initialize default tune playlist
+	_file->readBootFile();                              // Read startup structure
 }
 
 /**
@@ -577,7 +618,7 @@ void HugoEngine::resetConfig() {
 
 	// Find first tune and play it
 	for (int16 i = 0; i < kMaxTunes; i++) {
-		if (_config.playlist[i]) {
+		if (_config._playlist[i]) {
 			_sound->playMusic(i);
 			break;
 		}
@@ -587,7 +628,7 @@ void HugoEngine::resetConfig() {
 void HugoEngine::initialize() {
 	debugC(1, kDebugEngine, "initialize");
 
-	_maze.enabledFl = false;
+	_maze._enabledFl = false;
 	_line[0] = '\0';
 
 	_sound->initSound();
@@ -639,10 +680,10 @@ void HugoEngine::readScreenFiles(const int screenNum) {
 	memcpy(_screen->getBackBuffer(), _screen->getFrontBuffer(), sizeof(_screen->getFrontBuffer())); // Make a copy
 
 	// Workaround for graphic glitches in DOS versions. Cleaning the overlays fix the problem
-	memset(_object->_objBound, '\0', sizeof(overlay_t));
-	memset(_object->_boundary, '\0', sizeof(overlay_t));
-	memset(_object->_overlay,  '\0', sizeof(overlay_t));
-	memset(_object->_ovlBase,  '\0', sizeof(overlay_t));
+	memset(_object->_objBound, '\0', sizeof(Overlay));
+	memset(_object->_boundary, '\0', sizeof(Overlay));
+	memset(_object->_overlay,  '\0', sizeof(Overlay));
+	memset(_object->_ovlBase,  '\0', sizeof(Overlay));
 
 	_file->readOverlay(screenNum, _object->_boundary, kOvlBoundary); // Boundary file
 	_file->readOverlay(screenNum, _object->_overlay, kOvlOverlay);   // Overlay file
@@ -660,7 +701,7 @@ void HugoEngine::readScreenFiles(const int screenNum) {
 void HugoEngine::setNewScreen(const int screenNum) {
 	debugC(1, kDebugEngine, "setNewScreen(%d)", screenNum);
 
-	*_screen_p = screenNum;                         // HERO object
+	*_screenPtr = screenNum;                        // HERO object
 	_object->setCarriedScreen(screenNum);           // Carried objects
 }
 
@@ -679,10 +720,10 @@ void HugoEngine::calcMaxScore() {
 void HugoEngine::endGame() {
 	debugC(1, kDebugEngine, "endGame");
 
-	if (_boot.registered != kRegRegistered)
+	if (_boot._registered != kRegRegistered)
 		Utils::notifyBox(_text->getTextEngine(kEsAdvertise));
 	Utils::notifyBox(Common::String::format("%s\n%s", _episode, getCopyrightString()));
-	_status.viewState = kViewExit;
+	_status._viewState = kViewExit;
 }
 
 bool HugoEngine::canLoadGameStateCurrently() {
@@ -690,11 +731,11 @@ bool HugoEngine::canLoadGameStateCurrently() {
 }
 
 bool HugoEngine::canSaveGameStateCurrently() {
-	return (_status.viewState == kViewPlay);
+	return (_status._viewState == kViewPlay);
 }
 
 int8 HugoEngine::getTPS() const {
-	return ((_config.turboFl) ? kTurboTps : _normalTPS);
+	return ((_config._turboFl) ? kTurboTps : _normalTPS);
 }
 
 void HugoEngine::syncSoundSettings() {

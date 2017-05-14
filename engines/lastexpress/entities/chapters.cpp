@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,13 +44,13 @@
 #include "lastexpress/entities/pascale.h"
 #include "lastexpress/entities/rebecca.h"
 #include "lastexpress/entities/salko.h"
-#include "lastexpress/entities/servers0.h"
-#include "lastexpress/entities/servers1.h"
 #include "lastexpress/entities/sophie.h"
 #include "lastexpress/entities/tatiana.h"
 #include "lastexpress/entities/vassili.h"
 #include "lastexpress/entities/verges.h"
 #include "lastexpress/entities/vesna.h"
+#include "lastexpress/entities/waiter1.h"
+#include "lastexpress/entities/waiter2.h"
 #include "lastexpress/entities/yasmin.h"
 
 #include "lastexpress/game/action.h"
@@ -63,11 +63,9 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/menu/menu.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/sound/queue.h"
 
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
 
@@ -79,7 +77,7 @@ Chapters::Chapters(LastExpressEngine *engine) : Entity(engine, kEntityChapters) 
 	ADD_CALLBACK_FUNCTION(Chapters, exitStation);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1);
 	ADD_CALLBACK_FUNCTION(Chapters, resetMainEntities);
-	ADD_CALLBACK_FUNCTION(Chapters, chapter1End);
+	ADD_CALLBACK_FUNCTION(Chapters, firstDream);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Init);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Handler);
 	ADD_CALLBACK_FUNCTION(Chapters, chapter1Next);
@@ -152,11 +150,12 @@ IMPLEMENT_FUNCTION(5, Chapters, resetMainEntities)
 	RESET_ENTITY_STATE(kEntityVesna, Vesna, setup_reset);
 	RESET_ENTITY_STATE(kEntityYasmin, Yasmin, setup_reset);
 
-	CALLBACK_ACTION();
+	callbackAction();
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
+IMPLEMENT_FUNCTION(6, Chapters, firstDream)
+	// Chapter 1 end
 	switch (savepoint.action) {
 	default:
 		break;
@@ -191,7 +190,7 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 
 			getScenes()->loadScene(kScene41);
 
-			CALLBACK_ACTION();
+			callbackAction();
 		} else {
 			getSound()->playSound(kEntityPlayer, "LIB014");
 			getSound()->playSound(kEntityPlayer, "LIB015", kFlagDefault, 15);
@@ -209,9 +208,9 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 
 	case kActionDefault:
 		RESET_ENTITY_STATE(kEntityPascale, Pascale, setup_function19);
-		RESET_ENTITY_STATE(kEntityServers0, Servers0, setup_function22);
-		RESET_ENTITY_STATE(kEntityServers1, Servers1, setup_function16);
-		RESET_ENTITY_STATE(kEntityCooks, Cooks, setup_function7);
+		RESET_ENTITY_STATE(kEntityWaiter1, Waiter1, setup_function22);
+		RESET_ENTITY_STATE(kEntityWaiter2, Waiter2, setup_function16);
+		RESET_ENTITY_STATE(kEntityCooks, Cooks, setup_lockUp);
 
 		RESET_ENTITY_STATE(kEntityMertens, Mertens, setup_function42);
 		RESET_ENTITY_STATE(kEntityCoudert, Coudert, setup_chapter1Handler);
@@ -222,8 +221,8 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 		getSavePoints()->push(kEntityChapters, kEntityVerges, kAction201431954);
 
 		RESET_ENTITY_STATE(kEntityKronos, Kronos, setup_function10);
-		RESET_ENTITY_STATE(kEntityKahina, Kahina, setup_function13);
-		RESET_ENTITY_STATE(kEntityAnna, Anna, setup_function34);
+		RESET_ENTITY_STATE(kEntityKahina, Kahina, setup_cathDone);
+		RESET_ENTITY_STATE(kEntityAnna, Anna, setup_asleep);
 		RESET_ENTITY_STATE(kEntityAugust, August, setup_function34);
 		RESET_ENTITY_STATE(kEntityTatiana, Tatiana, setup_function24);
 		RESET_ENTITY_STATE(kEntityVassili, Vassili, setup_function7);
@@ -271,7 +270,6 @@ IMPLEMENT_FUNCTION(6, Chapters, chapter1End)
 
 		if (getSoundQueue()->isBuffered("ZFX1007B"))
 			getSoundQueue()->processEntry("ZFX1007B");
-
 
 		getSound()->playSound(kEntityPlayer, "MUS008", kFlagDefault);
 		getInventory()->unselectItem();
@@ -351,19 +349,19 @@ IMPLEMENT_FUNCTION(7, Chapters, chapter1Init)
 	getObjects()->update(kObjectOutsideTylerCompartment, kEntityPlayer, kObjectLocationNone, kCursorKeepValue, kCursorKeepValue);
 
 	for (uint i = kObjectCompartment1; i <= kObjectCompartment8; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	for (uint i = kObjectCompartmentA; i <= kObjectCompartmentH; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	params->param1 = 40;
 
-	getObjects()->updateLocation2(kObject25, kObjectLocation1);
-	getObjects()->updateLocation2(kObjectTrainTimeTable, kObjectLocation1);
-	getObjects()->updateLocation2(kObject98, kObjectLocation1);
-	getObjects()->updateLocation2(kObjectRestaurantCar, kObjectLocation1);
+	getObjects()->updateModel(kObject25, kObjectModel1);
+	getObjects()->updateModel(kObjectTrainTimeTable, kObjectModel1);
+	getObjects()->updateModel(kObject98, kObjectModel1);
+	getObjects()->updateModel(kObjectRestaurantCar, kObjectModel1);
 
 	getObjects()->update(kObject25, kEntityPlayer, kObjectLocationNone, kCursorNormal, kCursorForward);
 	getObjects()->update(kObjectTrainTimeTable, kEntityPlayer, kObjectLocationNone, kCursorNormal, kCursorForward);
@@ -386,13 +384,8 @@ IMPLEMENT_FUNCTION(7, Chapters, chapter1Init)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-#define PLAY_STEAM() { \
-	getSoundQueue()->resetState(); \
-	getSound()->playSteam((CityIndex)ENTITY_PARAM(0, 4)); \
-	ENTITY_PARAM(0, 2) = 0; \
-	}
-
 IMPLEMENT_FUNCTION(8, Chapters, chapter1Handler)
+	// Moving at night
 	switch (savepoint.action) {
 	default:
 		break;
@@ -401,21 +394,28 @@ IMPLEMENT_FUNCTION(8, Chapters, chapter1Handler)
 		if (!getProgress().isTrainRunning || getState()->time >= kTime1458000)
 			goto label_processStations;
 
-		UPDATE_PARAM_PROC(params->param6, getState()->timeTicks, params->param2)
+		if (Entity::updateParameter(params->param6, getState()->timeTicks, params->param2)) {
 			// Play sound FX
 			getSound()->playLocomotiveSound();
 
 			params->param2 = 225 * (4 * rnd(5) + 20);
 			params->param6 = 0;
-		UPDATE_PARAM_PROC_END
+		}
 
 label_processStations:
 		// Process stations
-		TIME_CHECK_CALLBACK_2(kTime1039500, params->param7, 1, setup_savegame, kSavegameTypeTime, kTimeNone);
+		if (getState()->time > kTime1039500 && !params->param7) {
+			params->param7 = 1;
+			setCallback(1);
+			setup_savegame(kSavegameTypeTime, kTimeNone);
+
+			break;
+		}
 
 label_enter_epernay:
 		// Entering Epernay station
-		TIME_CHECK_CALLBACK_2(kTimeEnterEpernay, params->param8, 1, setup_enterStation, "Epernay", kCityEpernay);
+		if (timeCheckEnterStation(kTimeEnterEpernay, params->param8, 1, "Epernay", kCityEpernay))
+			break;
 
 label_exit_epernay:
 		// Exiting Epernay station
@@ -445,19 +445,23 @@ label_enter_chalons:
 			goto label_exit_strasbourg;
 
 		// Entering Chalons station
-		TIME_CHECK_CALLBACK_2(kTimeEnterChalons, CURRENT_PARAM(1, 3), 5, setup_enterStation, "Chalons", kCityChalons);
+		if (timeCheckEnterStation(kTimeEnterChalons, CURRENT_PARAM(1, 3), 5, "Chalons", kCityChalons))
+			break;
 
 label_exit_chalons:
 		// Exiting Chalons station
-		TIME_CHECK_CALLBACK_1(kTimeExitChalons, CURRENT_PARAM(1, 4), 6, setup_exitStation, "Chalons");
+		if (timeCheckExitStation(kTimeExitChalons, CURRENT_PARAM(1, 4), 6, "Chalons"))
+			break;
 
 label_enter_barleduc:
 		// Entering Bar-Le-Duc station
-		TIME_CHECK_CALLBACK_2(kTimeCityBarLeDuc, CURRENT_PARAM(1, 5), 7, setup_enterStation, "BarLeDuc", kCityBarleduc);
+		if (timeCheckEnterStation(kTimeCityBarLeDuc, CURRENT_PARAM(1, 5), 7, "BarLeDuc", kCityBarleduc))
+			break;
 
 label_exit_barleduc:
 		// Exiting Bar-Le-Duc station
-		TIME_CHECK_CALLBACK_1(kTimeExitBarLeDuc, CURRENT_PARAM(1, 6), 8, setup_exitStation, "BarLeDuc");
+		if (timeCheckExitStation(kTimeExitBarLeDuc, CURRENT_PARAM(1, 6), 8, "BarLeDuc"))
+			break;
 
 label_enter_nancy:
 		if (getState()->time > kTime1260000 && !CURRENT_PARAM(1, 7)) {
@@ -466,50 +470,67 @@ label_enter_nancy:
 		}
 
 		// Entering Nancy station
-		TIME_CHECK_CALLBACK_2(kTimeCityNancy, CURRENT_PARAM(1, 8), 9, setup_enterStation, "Nancy", kCityNancy);
+		if (timeCheckEnterStation(kTimeCityNancy, CURRENT_PARAM(1, 8), 9, "Nancy", kCityNancy))
+			break;
 
 label_exit_nancy:
 		// Exiting Nancy station
-		TIME_CHECK_CALLBACK_1(kTimeExitNancy, CURRENT_PARAM(2, 1), 10, setup_exitStation, "Nancy");
+		if (timeCheckExitStation(kTimeExitNancy, CURRENT_PARAM(2, 1), 10, "Nancy"))
+			break;
 
 label_enter_luneville:
 		// Entering Luneville station
-		TIME_CHECK_CALLBACK_2(kTimeCityLuneville, CURRENT_PARAM(2, 2), 11, setup_enterStation, "Luneville", kCityLuneville);
+		if (timeCheckEnterStation(kTimeCityLuneville, CURRENT_PARAM(2, 2), 11, "Luneville", kCityLuneville))
+			break;
 
 label_exit_luneville:
 		// Exiting Luneville station
-		TIME_CHECK_CALLBACK_1(kTimeExitLuneville, CURRENT_PARAM(2, 3), 12, setup_exitStation, "Luneville");
+		if (timeCheckExitStation(kTimeExitLuneville, CURRENT_PARAM(2, 3), 12, "Luneville"))
+			break;
 
 label_enter_avricourt:
 		// Entering Avricourt station
-		TIME_CHECK_CALLBACK_2(kTimeCityAvricourt, CURRENT_PARAM(2, 4), 13, setup_enterStation, "Avricourt", kCityAvricourt);
+		if (timeCheckEnterStation(kTimeCityAvricourt, CURRENT_PARAM(2, 4), 13, "Avricourt", kCityAvricourt))
+			break;
 
 label_exit_avricourt:
 		// Exiting Avricourt station
-		TIME_CHECK_CALLBACK_1(kTimeExitAvricourt, CURRENT_PARAM(2, 5), 14, setup_exitStation, "Avricourt");
+		if (timeCheckExitStation(kTimeExitAvricourt, CURRENT_PARAM(2, 5), 14, "Avricourt"))
+			break;
 
 label_enter_deutschavricourt:
 		// Entering Deutsch-Avricourt station
-		TIME_CHECK_CALLBACK_2(kTimeCityDeutschAvricourt, CURRENT_PARAM(2, 6), 15, setup_enterStation, "DeutschA", kCityDeutschAvricourt);
+		if (timeCheckEnterStation(kTimeCityDeutschAvricourt, CURRENT_PARAM(2, 6), 15, "DeutschA", kCityDeutschAvricourt))
+			break;
 
 label_exit_deutschavricourt:
 		// Exiting Avricourt station
-		TIME_CHECK_CALLBACK_1(kTimeExitDeutschAvricourt, CURRENT_PARAM(2, 7), 16, setup_exitStation, "DeutschA");
+		if (timeCheckExitStation(kTimeExitDeutschAvricourt, CURRENT_PARAM(2, 7), 16, "DeutschA"))
+			break;
 
 label_enter_strasbourg:
-		TIME_CHECK_CALLBACK_2(kTimeCityStrasbourg, CURRENT_PARAM(2, 8), 17, setup_savegame, kSavegameTypeTime, kTimeNone);
+		if (getState()->time > kTimeCityStrasbourg && !CURRENT_PARAM(2, 8)) {
+			CURRENT_PARAM(2, 8) = 1;
+			setCallback(17);
+			setup_savegame(kSavegameTypeTime, kTimeNone);
+
+			break;
+		}
 
 label_exit_strasbourg:
 		// Exiting Strasbourg station
-		TIME_CHECK_CALLBACK_1(kTimeExitStrasbourg, CURRENT_PARAM(3, 1), 19, setup_exitStation, "Strasbou");
+		if (timeCheckExitStation(kTimeExitStrasbourg, CURRENT_PARAM(3, 1), 19, "Strasbou"))
+			break;
 
 label_enter_badenoos:
 		// Entering Baden Oos station
-		TIME_CHECK_CALLBACK_2(kTimeCityBadenOos, CURRENT_PARAM(3, 2), 20, setup_enterStation, "BadenOos", kCityBadenOos);
+		if (timeCheckEnterStation(kTimeCityBadenOos, CURRENT_PARAM(3, 2), 20, "BadenOos", kCityBadenOos))
+			break;
 
 label_exit_badenoos:
 		// Exiting Baden Oos station
-		TIME_CHECK_CALLBACK_1(kTimeExitBadenOos, CURRENT_PARAM(3, 3), 21, setup_exitStation, "BadenOos");
+		if (timeCheckExitStation(kTimeExitBadenOos, CURRENT_PARAM(3, 3), 21, "BadenOos"))
+			break;
 
 label_chapter1_next:
 		if (getState()->time > kTimeChapter1End3 && ! CURRENT_PARAM(3, 4)) {
@@ -524,43 +545,43 @@ label_chapter1_next:
 			getSavePoints()->push(kEntityChapters, kEntityTrain, kActionTrainStopRunning);
 
 			if (getEntityData(kEntityPlayer)->location != kLocationOutsideTrain) {
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			if (getEntities()->isOutsideAlexeiWindow()) {
 				getScenes()->loadSceneFromPosition(kCarGreenSleeping, 49);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			if (getEntities()->isOutsideAnnaWindow()) {
 				getScenes()->loadSceneFromPosition(kCarRedSleeping, 49);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			CarIndex car = getEntityData(kEntityPlayer)->car;
 			if (car < kCarRedSleeping || car > kCarCoalTender) {
 				if (car < kCarBaggageRear || car > kCarGreenSleeping) {
-					PLAY_STEAM();
+					playSteam();
 					break;
 				}
 
 				if (getEntities()->isPlayerPosition(kCarGreenSleeping, 98)) {
 					getSound()->playSound(kEntityPlayer, "LIB015");
 					getScenes()->loadSceneFromPosition(kCarGreenSleeping, 71);
-					PLAY_STEAM();
+					playSteam();
 					break;
 				}
 
 				getScenes()->loadSceneFromPosition(kCarGreenSleeping, 82);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			getScenes()->loadSceneFromPosition(kCarRestaurant, 82);
-			PLAY_STEAM();
+			playSteam();
 			break;
 		}
 
@@ -685,7 +706,7 @@ label_chapter1_next:
 			setup_chapter1Next();
 		} else {
 			setCallback(23);
-			setup_chapter1End();
+			setup_firstDream();
 		}
 		break;
 	}
@@ -772,11 +793,11 @@ IMPLEMENT_FUNCTION(11, Chapters, chapter2Init)
 	getInventory()->setLocationAndProcess(kItem3, kObjectLocation1);
 
 	for (uint i = 1; i < 9; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	for (uint i = 33; i < 40; i++) {
-		getObjects()->updateLocation2((ObjectIndex)i, kObjectLocation2);
+		getObjects()->updateModel((ObjectIndex) i, kObjectModel2);
 	}
 
 	params->param1 = 40;
@@ -817,7 +838,8 @@ IMPLEMENT_FUNCTION(12, Chapters, chapter2Handler)
 		if (!getProgress().isTrainRunning)
 			break;
 
-		UPDATE_PARAM(params->param2, getState()->timeTicks, params->param1);
+		if (!Entity::updateParameter(params->param2, getState()->timeTicks, params->param1))
+			break;
 
 		getSound()->playLocomotiveSound();
 
@@ -872,7 +894,7 @@ IMPLEMENT_FUNCTION(14, Chapters, chapter3Init)
 		getObjects()->update(kObjectHandleOutsideRight, kEntityPlayer, kObjectLocation1, kCursorNormal, kCursorHand);
 		getInventory()->setLocationAndProcess(kItemBriefcase, kObjectLocation1);
 		getInventory()->setLocationAndProcess(kItem3, kObjectLocation1);
-		getObjects()->updateLocation2(kObjectCompartment1, kObjectLocation2);
+		getObjects()->updateModel(kObjectCompartment1, kObjectModel2);
 		getObjects()->update(kObject107, kEntityPlayer, kObjectLocation3, kCursorKeepValue, kCursorKeepValue);
 
 		if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
@@ -897,21 +919,22 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(15, Chapters, chapter3Handler)
+	// Moving during the afternoon
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
 		if (getProgress().isTrainRunning) {
-			UPDATE_PARAM_PROC(params->param4, getState()->timeTicks, params->param1)
+			if (Entity::updateParameter(params->param4, getState()->timeTicks, params->param1)) {
 				getSound()->playLocomotiveSound();
 
 				params->param1 = 225 * (4 * rnd(5) + 20);
 				params->param4 = 0;
-			UPDATE_PARAM_PROC_END
+			}
 		}
 
-		UPDATE_PARAM_PROC(params->param5, getState()->timeTicks, params->param2)
+		if (Entity::updateParameter(params->param5, getState()->timeTicks, params->param2)) {
 			switch (rnd(2)) {
 			default:
 				break;
@@ -927,30 +950,38 @@ IMPLEMENT_FUNCTION(15, Chapters, chapter3Handler)
 
 			params->param2 = 225 * (4 * rnd(6) + 8);
 			params->param5 = 0;
-		UPDATE_PARAM_PROC_END
+		}
 
-		TIME_CHECK_CALLBACK_2(kTimeEnterSalzbourg, params->param6, 1, setup_enterStation, "Salzburg", kCitySalzbourg);
+		if (timeCheckEnterStation(kTimeEnterSalzbourg, params->param6, 1, "Salzburg", kCitySalzbourg))
+			break;
 
 label_callback_1:
-		TIME_CHECK_CALLBACK_1(kTimeExitSalzbourg, params->param7, 2, setup_exitStation, "Salzburg");
+		if (timeCheckExitStation(kTimeExitSalzbourg, params->param7, 2, "Salzburg"))
+			break;
 
 label_callback_2:
-		TIME_CHECK_CALLBACK_2(kTimeEnterAttnangPuchheim, params->param8, 3, setup_enterStation, "Attnang", kCityAttnangPuchheim);
+		if (timeCheckEnterStation(kTimeEnterAttnangPuchheim, params->param8, 3, "Attnang", kCityAttnangPuchheim))
+			break;
 
 label_callback_3:
-		TIME_CHECK_CALLBACK_1(kTimeExitAttnangPuchheim, CURRENT_PARAM(1, 1), 4, setup_exitStation, "Attnang");
+		if (timeCheckExitStation(kTimeExitAttnangPuchheim, CURRENT_PARAM(1, 1), 4, "Attnang"))
+			break;
 
 label_callback_4:
-		TIME_CHECK_CALLBACK_2(kTimeEnterWels, CURRENT_PARAM(1, 2), 5, setup_enterStation, "Wels", kCityWels);
+		if (timeCheckEnterStation(kTimeEnterWels, CURRENT_PARAM(1, 2), 5, "Wels", kCityWels))
+			break;
 
 label_callback_5:
-		TIME_CHECK_CALLBACK_1(kTimeEnterWels, CURRENT_PARAM(1, 3), 6, setup_exitStation, "Wels");
+		if (timeCheckExitStation(kTimeEnterWels, CURRENT_PARAM(1, 3), 6, "Wels"))
+			break;
 
 label_callback_6:
-		TIME_CHECK_CALLBACK_2(kTimeEnterLinz, CURRENT_PARAM(1, 4), 7, setup_enterStation, "Linz", kCityLinz);
+		if (timeCheckEnterStation(kTimeEnterLinz, CURRENT_PARAM(1, 4), 7, "Linz", kCityLinz))
+			break;
 
 label_callback_7:
-		TIME_CHECK_CALLBACK_1(kTimeCityLinz, CURRENT_PARAM(1, 5), 8, setup_exitStation, "Linz");
+		if (timeCheckExitStation(kTimeCityLinz, CURRENT_PARAM(1, 5), 8, "Linz"))
+			break;
 
 label_callback_8:
 		if (getState()->time > kTime2187000 && !CURRENT_PARAM(1, 6)) {
@@ -958,7 +989,7 @@ label_callback_8:
 			getState()->timeDelta = 5;
 		}
 
-		TIME_CHECK_CALLBACK_2(kTimeCityVienna, CURRENT_PARAM(1, 7), 9, setup_enterStation, "Vienna", kCityVienna);
+		timeCheckEnterStation(kTimeCityVienna, CURRENT_PARAM(1, 7), 9, "Vienna", kCityVienna);
 		break;
 
 	case kActionEndSound:
@@ -1049,6 +1080,7 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(16, Chapters, viennaEvents)
+	// End in Vienna
 	switch (savepoint.action) {
 	default:
 		break;
@@ -1175,7 +1207,7 @@ IMPLEMENT_FUNCTION(18, Chapters, chapter4Init)
 	if (getInventory()->get(kItemBeetle)->location == kObjectLocation3)
 		getScenes()->loadSceneFromItemPosition(kItemBeetle);
 
-	getObjects()->updateLocation2(kObject25, kObjectLocation2);
+	getObjects()->updateModel(kObject25, kObjectModel2);
 	getObjects()->update(kObject107, kEntityPlayer, kObjectLocation3, kCursorKeepValue, kCursorKeepValue);
 
 	if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
@@ -1196,21 +1228,22 @@ IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
 IMPLEMENT_FUNCTION(19, Chapters, chapter4Handler)
+	// Moving during the second night
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
 		if (getProgress().isTrainRunning) {
-			UPDATE_PARAM_PROC(params->param6, getState()->timeTicks, params->param4);
+			if (Entity::updateParameter(params->param6, getState()->timeTicks, params->param4)) {
 				getSound()->playLocomotiveSound();
 
 				params->param4 = 225 * (4 * rnd(5) + 20);
 				params->param6 = 0;
-			UPDATE_PARAM_PROC_END
+			}
 		}
 
-		UPDATE_PARAM_PROC(params->param7, getState()->timeTicks, params->param5)
+		if (Entity::updateParameter(params->param7, getState()->timeTicks, params->param5)) {
 			switch (rnd(2)) {
 			default:
 				break;
@@ -1226,15 +1259,17 @@ IMPLEMENT_FUNCTION(19, Chapters, chapter4Handler)
 
 			params->param5 = 225 * (4 * rnd(6) + 8);
 			params->param7 = 0;
-		UPDATE_PARAM_PROC_END
+		}
 
-		TIME_CHECK_CALLBACK_2(kTimeEnterPoszony, params->param8, 1, setup_enterStation, "Pozsony", kCityPoszony);
+		if (timeCheckEnterStation(kTimeEnterPoszony, params->param8, 1, "Pozsony", kCityPoszony))
+			break;
 
 label_exitPozsony:
-		TIME_CHECK_CALLBACK_1(kTimeExitPoszony, CURRENT_PARAM(1, 1), 2, setup_exitStation, "Pozsony");
+		if (timeCheckExitStation(kTimeExitPoszony, CURRENT_PARAM(1, 1), 2, "Pozsony"))
+			break;
 
 label_enterGalanta:
-		if (getObjects()->get(kObjectCompartment1).location2 == kObjectLocation1) {
+		if (getObjects()->get(kObjectCompartment1).model == kObjectModel1) {
 			if (getState()->time > kTime2403000 && !CURRENT_PARAM(1, 2)) {
 				CURRENT_PARAM(1, 2) = 1;
 				getProgress().field_18 = 2;
@@ -1244,10 +1279,12 @@ label_enterGalanta:
 		if (params->param1)
 			goto label_callback_4;
 
-		TIME_CHECK_CALLBACK_2(kTimeEnterGalanta, CURRENT_PARAM(1, 3), 3, setup_enterStation, "Galanta", kCityGalanta);
+		if (timeCheckEnterStation(kTimeEnterGalanta, CURRENT_PARAM(1, 3), 3, "Galanta", kCityGalanta))
+			break;
 
 label_exitGalanta:
-		TIME_CHECK_CALLBACK_1(kTimeExitGalanta, CURRENT_PARAM(1, 4), 4, setup_exitStation, "Galanta");
+		if (timeCheckExitStation(kTimeExitGalanta, CURRENT_PARAM(1, 4), 4, "Galanta"))
+			break;
 
 label_callback_4:
 		if (getState()->time > kTime2470500 && !CURRENT_PARAM(1, 5)) {
@@ -1280,43 +1317,43 @@ label_callback_4:
 			getSavePoints()->push(kEntityChapters, kEntityTrain, kActionTrainStopRunning);
 
 			if (getEntityData(kEntityPlayer)->location != kLocationOutsideTrain) {
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			if (getEntities()->isOutsideAlexeiWindow()) {
 				getScenes()->loadSceneFromPosition(kCarGreenSleeping, 49);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			if (getEntities()->isOutsideAnnaWindow()) {
 				getScenes()->loadSceneFromPosition(kCarRedSleeping, 49);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			CarIndex car = getEntityData(kEntityPlayer)->car;
 			if (car < kCarRedSleeping || car > kCarCoalTender) {
 				if (car < kCarBaggageRear || car > kCarGreenSleeping) {
-					PLAY_STEAM();
+					playSteam();
 					break;
 				}
 
 				if (getEntities()->isPlayerPosition(kCarGreenSleeping, 98)) {
 					getSound()->playSound(kEntityPlayer, "LIB015");
 					getScenes()->loadSceneFromPosition(kCarGreenSleeping, 71);
-					PLAY_STEAM();
+					playSteam();
 					break;
 				}
 
 				getScenes()->loadSceneFromPosition(kCarGreenSleeping, 82);
-				PLAY_STEAM();
+				playSteam();
 				break;
 			}
 
 			getScenes()->loadSceneFromPosition(kCarRestaurant, 82);
-			PLAY_STEAM();
+			playSteam();
 			break;
 		}
 
@@ -1407,7 +1444,7 @@ label_callback_4:
 
 		case 10:
 			getAction()->playAnimation(kEventDefuseBomb);
-			RESET_ENTITY_STATE(kEntityAbbot, Abbot, setup_function48);
+			RESET_ENTITY_STATE(kEntityAbbot, Abbot, setup_afterBomb);
 			getSavePoints()->push(kEntityChapters, kEntityAnna, kAction191001984);
 			getSavePoints()->push(kEntityChapters, kEntityCoudert, kAction191001984);
 			getScenes()->loadSceneFromItemPosition(kItem2);
@@ -1481,12 +1518,12 @@ label_callback_4:
 
 		if (getInventory()->hasItem(kItemBomb)) {
 			RESET_ENTITY_STATE(kEntityAlexei, Alexei, setup_function47);
-			RESET_ENTITY_STATE(kEntityAnna, Anna, setup_function68);
+			RESET_ENTITY_STATE(kEntityAnna, Anna, setup_sulking);
 			RESET_ENTITY_STATE(kEntityAugust, August, setup_function65);
 			RESET_ENTITY_STATE(kEntityMertens, Mertens, setup_function48);
 			RESET_ENTITY_STATE(kEntityCoudert, Coudert, setup_function53);
-			RESET_ENTITY_STATE(kEntityServers0, Servers0, setup_chapter4Handler);
-			RESET_ENTITY_STATE(kEntityServers1, Servers1, setup_chapter4Handler);
+			RESET_ENTITY_STATE(kEntityWaiter1, Waiter1, setup_serving4);
+			RESET_ENTITY_STATE(kEntityWaiter2, Waiter2, setup_serving4);
 			RESET_ENTITY_STATE(kEntityPascale, Pascale, setup_chapter4Handler);
 			RESET_ENTITY_STATE(kEntityVerges, Verges, setup_chapter4Handler);
 			RESET_ENTITY_STATE(kEntityTatiana, Tatiana, setup_function49);
@@ -1502,12 +1539,12 @@ label_callback_4:
 			RESET_ENTITY_STATE(kEntityYasmin, Yasmin, setup_function17);
 			RESET_ENTITY_STATE(kEntityHadija, Hadija, setup_function19);
 			RESET_ENTITY_STATE(kEntityAlouan, Alouan, setup_function19);
-			RESET_ENTITY_STATE(kEntityMax, Max, setup_chapter4Handler);
+			RESET_ENTITY_STATE(kEntityMax, Max, setup_inCageFriendly);
 			getSavePoints()->push(kEntityChapters, kEntityAnna, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityMertens, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityCoudert, kAction201431954);
-			getSavePoints()->push(kEntityChapters, kEntityServers0, kAction201431954);
-			getSavePoints()->push(kEntityChapters, kEntityServers1, kAction201431954);
+			getSavePoints()->push(kEntityChapters, kEntityWaiter1, kAction201431954);
+			getSavePoints()->push(kEntityChapters, kEntityWaiter2, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityPascale, kAction201431954);
 			getSavePoints()->push(kEntityChapters, kEntityVerges, kAction201431954);
 
@@ -1642,8 +1679,8 @@ IMPLEMENT_FUNCTION(21, Chapters, chapter5Init)
 		getObjects()->update(kObject94, kEntityPlayer, kObjectLocationNone, kCursorKeepValue, kCursorKeepValue);
 		getObjects()->update(kObject101, kEntityPlayer, kObjectLocationNone, kCursorHandKnock, kCursorHand);
 
-		getObjects()->updateLocation2(kObject98, kObjectLocation2);
-		getObjects()->updateLocation2(kObjectRestaurantCar, kObjectLocation2);
+		getObjects()->updateModel(kObject98, kObjectModel2);
+		getObjects()->updateModel(kObjectRestaurantCar, kObjectModel2);
 
 		if (ENTITY_PARAM(0, 2) || ENTITY_PARAM(0, 3)) {
 			getSoundQueue()->removeFromQueue(kEntityChapters);
@@ -1720,7 +1757,6 @@ IMPLEMENT_FUNCTION(22, Chapters, chapter5Handler)
 		break;
 	}
 IMPLEMENT_FUNCTION_END
-
 
 //////////////////////////////////////////////////////////////////////////
 // Private functions
@@ -1815,7 +1851,37 @@ void Chapters::enterExitHelper(bool isEnteringStation) {
 		ENTITY_PARAM(0, 3) = 1;
 	}
 
-	CALLBACK_ACTION();
+	callbackAction();
+}
+
+void Chapters::playSteam() const {
+	getSoundQueue()->resetState();
+	getSound()->playSteam((CityIndex)ENTITY_PARAM(0, 4));
+	ENTITY_PARAM(0, 2) = 0;
+}
+
+bool Chapters::timeCheckEnterStation(TimeValue timeValue, uint &parameter, byte callback, const char *sequence, CityIndex cityIndex) {
+	if (getState()->time > timeValue && !parameter) {
+		parameter = 1;
+		setCallback(callback);
+		setup_enterStation(sequence, cityIndex);
+
+		return true;
+	}
+
+	return false;
+}
+
+bool Chapters::timeCheckExitStation(TimeValue timeValue, uint &parameter, byte callback, const char *sequence) {
+	if (getState()->time > timeValue && !parameter) {
+		parameter = 1;
+		setCallback(callback);
+		setup_exitStation(sequence);
+
+		return true;
+	}
+
+	return false;
 }
 
 } // End of namespace LastExpress

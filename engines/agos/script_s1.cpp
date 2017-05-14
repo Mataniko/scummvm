@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,6 +26,8 @@
 #include "graphics/palette.h"
 
 #include "agos/agos.h"
+#include "agos/intern.h"
+#include "agos/sound.h"
 
 #ifdef _WIN32_WCE
 extern bool isSmartphone();
@@ -360,6 +362,15 @@ void AGOSEngine_Simon1::os1_screenTextMsg() {
 	if (((getGameType() == GType_SIMON2 && (getFeatures() & GF_TALKIE)) || getGameType() == GType_FF) &&
 		speechId == 0) {
 		stopAnimateSimon2(2, vgaSpriteId + 2);
+	}
+
+	// WORKAROUND: Several strings in the French version of Simon the Sorcerer 1 set the incorrect width,
+	// causing crashes, or glitches in subtitles. See bug #3512776 for example.
+	if (getGameType() == GType_SIMON1 && _language == Common::FR_FRA) {
+		if ((getFeatures() & GF_TALKIE) && stringId == 33219)
+			tl->width = 96;
+		if (!(getFeatures() & GF_TALKIE) && stringId == 33245)
+			tl->width = 96;
 	}
 
 	if (stringPtr != NULL && stringPtr[0] != 0 && (speechId == 0 || _subtitles))

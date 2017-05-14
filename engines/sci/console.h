@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -33,7 +33,7 @@ namespace Sci {
 class SciEngine;
 struct List;
 
-reg_t disassemble(EngineState *s, reg_t pos, bool printBWTag, bool printBytecode);
+reg_t disassemble(EngineState *s, reg32_t pos, reg_t objAddr, bool printBWTag, bool printBytecode);
 bool isJumpOpcode(EngineState *s, reg_t pos, reg_t& jumpOffset);
 
 class Console : public GUI::Debugger {
@@ -41,7 +41,11 @@ public:
 	Console(SciEngine *engine);
 	virtual ~Console();
 
-	int printObject(reg_t pos);
+#ifdef ENABLE_SCI32
+	void printArray(reg_t reg);
+	void printBitmap(reg_t reg);
+#endif
+	int printObject(reg_t reg);
 
 private:
 	virtual void preEnter();
@@ -68,11 +72,13 @@ private:
 	bool cmdSaid(int argc, const char **argv);
 	// Resources
 	bool cmdDiskDump(int argc, const char **argv);
+	void cmdDiskDumpWorker(ResourceType resourceType, int resourceNumber, uint32 resourceTuple);
 	bool cmdHexDump(int argc, const char **argv);
 	bool cmdResourceId(int argc, const char **argv);
 	bool cmdResourceInfo(int argc, const char **argv);
 	bool cmdResourceTypes(int argc, const char **argv);
 	bool cmdList(int argc, const char **argv);
+	bool cmdAllocList(int argc, const char **argv);
 	bool cmdHexgrep(int argc, const char **argv);
 	bool cmdVerifyScripts(int argc, const char **argv);
 	// Game
@@ -94,6 +100,10 @@ private:
 	bool cmdPlayVideo(int argc, const char **argv);
 	bool cmdAnimateList(int argc, const char **argv);
 	bool cmdWindowList(int argc, const char **argv);
+	bool cmdPlaneList(int argc, const char **argv);
+	bool cmdVisiblePlaneList(int argc, const char **argv);
+	bool cmdPlaneItemList(int argc, const char **argv);
+	bool cmdVisiblePlaneItemList(int argc, const char **argv);
 	bool cmdSavedBits(int argc, const char **argv);
 	bool cmdShowSavedBits(int argc, const char **argv);
 	// Segments
@@ -117,6 +127,7 @@ private:
 	bool cmdSfx01Track(int argc, const char **argv);
 	bool cmdShowInstruments(int argc, const char **argv);
 	bool cmdMapInstrument(int argc, const char **argv);
+	bool cmdAudioList(int argc, const char **argv);
 	// Script
 	bool cmdAddresses(int argc, const char **argv);
 	bool cmdRegisters(int argc, const char **argv);
@@ -134,6 +145,7 @@ private:
 	bool cmdSend(int argc, const char **argv);
 	bool cmdGo(int argc, const char **argv);
 	bool cmdLogKernel(int argc, const char **argv);
+	bool cmdMapVocab994(int argc, const char **argv);
 	// Breakpoints
 	bool cmdBreakpointList(int argc, const char **argv);
 	bool cmdBreakpointDelete(int argc, const char **argv);
@@ -142,26 +154,34 @@ private:
 	bool cmdBreakpointWrite(int argc, const char **argv);
 	bool cmdBreakpointKernel(int argc, const char **argv);
 	bool cmdBreakpointFunction(int argc, const char **argv);
+	bool cmdBreakpointAddress(int argc, const char **argv);
 	// VM
 	bool cmdScriptSteps(int argc, const char **argv);
+	bool cmdScriptObjects(int argc, const char **argv);
+	bool cmdScriptStrings(int argc, const char **argv);
+	bool cmdScriptSaid(int argc, const char **argv);
 	bool cmdVMVarlist(int argc, const char **argv);
 	bool cmdVMVars(int argc, const char **argv);
 	bool cmdStack(int argc, const char **argv);
 	bool cmdValueType(int argc, const char **argv);
 	bool cmdViewListNode(int argc, const char **argv);
 	bool cmdViewReference(int argc, const char **argv);
+	bool cmdDumpReference(int argc, const char **argv);
 	bool cmdViewObject(int argc, const char **argv);
 	bool cmdViewActiveObject(int argc, const char **argv);
 	bool cmdViewAccumulatorObject(int argc, const char **argv);
 
 	bool parseInteger(const char *argument, int &result);
+	bool parseResourceNumber36(const char *userParameter, uint16 &resourceNumber, uint32 &resourceTuple);
 
 	void printBasicVarInfo(reg_t variable);
 
 	bool segmentInfo(int nr);
-	void printList(List *list);
+	void printList(reg_t addr);
+	void printList(const List &list);
 	int printNode(reg_t addr);
 	void hexDumpReg(const reg_t *data, int len, int regsPerLine = 4, int startOffset = 0, bool isArray = false);
+	void printOffsets(int scriptNr, uint16 showType);
 
 private:
 	/**
@@ -173,7 +193,6 @@ private:
 
 	SciEngine *_engine;
 	DebugState &_debugState;
-	bool _mouseVisible;
 	Common::String _videoFile;
 	int _videoFrameDelay;
 };

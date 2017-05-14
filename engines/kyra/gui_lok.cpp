@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -48,19 +48,16 @@ int KyraEngine_LoK::buttonInventoryCallback(Button *caller) {
 			snd_playSoundEffect(0x36);
 			return 0;
 		} else {
-			_screen->hideMouse();
 			_screen->fillRect(_itemPosX[itemOffset], _itemPosY[itemOffset], _itemPosX[itemOffset] + 15, _itemPosY[itemOffset] + 15, _flags.platform == Common::kPlatformAmiga ? 19 : 12);
 			snd_playSoundEffect(0x35);
 			setMouseItem(inventoryItem);
 			updateSentenceCommand(_itemList[getItemListIndex(inventoryItem)], _takenList[0], 179);
 			_itemInHand = inventoryItem;
-			_screen->showMouse();
 			_currentCharacter->inventoryItems[itemOffset] = kItemNone;
 		}
 	} else {
 		if (inventoryItem != kItemNone) {
 			snd_playSoundEffect(0x35);
-			_screen->hideMouse();
 			_screen->fillRect(_itemPosX[itemOffset], _itemPosY[itemOffset], _itemPosX[itemOffset] + 15, _itemPosY[itemOffset] + 15, _flags.platform == Common::kPlatformAmiga ? 19 : 12);
 			_screen->drawShape(0, _shapes[216 + _itemInHand], _itemPosX[itemOffset], _itemPosY[itemOffset], 0, 0);
 			setMouseItem(inventoryItem);
@@ -69,16 +66,13 @@ int KyraEngine_LoK::buttonInventoryCallback(Button *caller) {
 				updateSentenceCommand(_itemList[getItemListIndex(inventoryItem)], _takenList[0], 179);
 			else
 				updateSentenceCommand(_itemList[getItemListIndex(inventoryItem)], _takenList[1], 179);
-			_screen->showMouse();
 			_currentCharacter->inventoryItems[itemOffset] = _itemInHand;
 			_itemInHand = inventoryItem;
 		} else {
 			snd_playSoundEffect(0x32);
-			_screen->hideMouse();
 			_screen->drawShape(0, _shapes[216 + _itemInHand], _itemPosX[itemOffset], _itemPosY[itemOffset], 0, 0);
 			_screen->setMouseCursor(1, 1, _shapes[0]);
 			updateSentenceCommand(_itemList[getItemListIndex(_itemInHand)], _placedList[0], 179);
-			_screen->showMouse();
 			_currentCharacter->inventoryItems[itemOffset] = _itemInHand;
 			_itemInHand = kItemNone;
 		}

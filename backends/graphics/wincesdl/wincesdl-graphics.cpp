@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -42,8 +42,8 @@
 #include "backends/platform/wince/CEScaler.h"
 #include "backends/platform/wince/CEgui/ItemAction.h"
 
-WINCESdlGraphicsManager::WINCESdlGraphicsManager(SdlEventSource *sdlEventSource)
-	: SurfaceSdlGraphicsManager(sdlEventSource),
+WINCESdlGraphicsManager::WINCESdlGraphicsManager(SdlEventSource *sdlEventSource, SdlWindow *window)
+	: SurfaceSdlGraphicsManager(sdlEventSource, window),
 	  _panelInitialized(false), _noDoubleTapRMB(false), _noDoubleTapPT(false),
 	  _toolbarHighDrawn(false), _newOrientation(0), _orientationLandscape(0),
 	  _panelVisible(true), _saveActiveToolbar(NAME_MAIN_PANEL), _panelStateForced(false),
@@ -934,7 +934,7 @@ bool WINCESdlGraphicsManager::loadGFXMode() {
 		_toolbarHigh = NULL;
 
 	// keyboard cursor control, some other better place for it?
-	_eventSource->resetKeyboadEmulation(_videoMode.screenWidth * _scaleFactorXm / _scaleFactorXd - 1, _videoMode.screenHeight * _scaleFactorXm / _scaleFactorXd - 1);
+	_eventSource->resetKeyboardEmulation(_videoMode.screenWidth * _scaleFactorXm / _scaleFactorXd - 1, _videoMode.screenHeight * _scaleFactorXm / _scaleFactorXd - 1);
 
 	return true;
 }
@@ -1023,22 +1023,24 @@ bool WINCESdlGraphicsManager::saveScreenshot(const char *filename) {
 	return true;
 }
 
-void WINCESdlGraphicsManager::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {
+void WINCESdlGraphicsManager::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
 	assert(_transactionMode == kTransactionNone);
 
 	if (_overlayscreen == NULL)
 		return;
 
+	const byte *src = (const byte *)buf;
+
 	// Clip the coordinates
 	if (x < 0) {
 		w += x;
-		buf -= x;
+		src -= x * 2;
 		x = 0;
 	}
 
 	if (y < 0) {
 		h += y;
-		buf -= y * pitch;
+		src -= y * pitch;
 		y = 0;
 	}
 
@@ -1063,23 +1065,24 @@ void WINCESdlGraphicsManager::copyRectToOverlay(const OverlayColor *buf, int pit
 
 	byte *dst = (byte *)_overlayscreen->pixels + y * _overlayscreen->pitch + x * 2;
 	do {
-		memcpy(dst, buf, w * 2);
+		memcpy(dst, src, w * 2);
 		dst += _overlayscreen->pitch;
-		buf += pitch;
+		src += pitch;
 	} while (--h);
 
 	SDL_UnlockSurface(_overlayscreen);
 }
 
-void WINCESdlGraphicsManager::copyRectToScreen(const byte *src, int pitch, int x, int y, int w, int h) {
+void WINCESdlGraphicsManager::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	assert(_transactionMode == kTransactionNone);
-	assert(src);
+	assert(buf);
 
 	if (_screen == NULL)
 		return;
 
 	Common::StackLock lock(_graphicsMutex); // Lock the mutex until this function ends
 
+	const byte *src = (const byte *)buf;
 	/* Clip the coordinates */
 	if (x < 0) {
 		w += x;
@@ -1128,7 +1131,7 @@ void WINCESdlGraphicsManager::copyRectToScreen(const byte *src, int pitch, int x
 	SDL_UnlockSurface(_screen);
 }
 
-void WINCESdlGraphicsManager::setMouseCursor(const byte *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, int cursorTargetScale, const Graphics::PixelFormat *format) {
+void WINCESdlGraphicsManager::setMouseCursor(const void *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
 
 	undrawMouse();
 	if (w == 0 || h == 0)

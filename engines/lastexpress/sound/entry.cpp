@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -30,11 +30,8 @@
 #include "lastexpress/sound/sound.h"
 
 #include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
-
-#include "common/stream.h"
 
 namespace LastExpress {
 
@@ -46,6 +43,8 @@ namespace LastExpress {
 //////////////////////////////////////////////////////////////////////////
 SoundEntry::SoundEntry(LastExpressEngine *engine) : _engine(engine) {
 	_type = kSoundTypeNone;
+
+	_currentDataPtr = NULL;
 
 	_blockCount = 0;
 	_time = 0;
@@ -71,7 +70,13 @@ SoundEntry::~SoundEntry() {
 	// Entries that have been queued will have their streamed disposed automatically
 	if (!_soundStream)
 		SAFE_DELETE(_stream);
-	delete _soundStream;
+
+	SAFE_DELETE(_soundStream);
+
+	free(_currentDataPtr);
+
+	_subtitle = NULL;
+	_stream = NULL;
 
 	// Zero passed pointers
 	_engine = NULL;
@@ -110,10 +115,8 @@ void SoundEntry::close() {
 }
 
 void SoundEntry::play() {
-	if (!_stream) {
-		warning("[SoundEntry::play] stream has been disposed");
-		return;
-	}
+	if (!_stream)
+		error("[SoundEntry::play] stream has been disposed");
 
 	// Prepare sound stream
 	if (!_soundStream)
@@ -263,6 +266,8 @@ void SoundEntry::update(uint val) {
 }
 
 bool SoundEntry::updateSound() {
+	assert(_name2.size() <= 16);
+
 	bool result;
 	char sub[16];
 
@@ -275,9 +280,10 @@ bool SoundEntry::updateSound() {
 				_status.status &= ~0x8000;
 				strcpy(sub, _name2.c_str());
 
+				// FIXME: Rewrite and document expected behavior
 				int l = strlen(sub) + 1;
 				if (l - 1 > 4)
-					sub[l - 1 - 4] = 0;
+					sub[l - (1 + 4)] = 0;
 				showSubtitle(sub);
 			}
 		} else {
@@ -357,7 +363,10 @@ void SoundEntry::showSubtitle(Common::String filename) {
 }
 
 void SoundEntry::saveLoadWithSerializer(Common::Serializer &s) {
-	if (_name2.matchString("NISSND?") && (_status.status & kFlagType7) != kFlag3) {
+	assert(_name1.size() <= 16);
+	assert(_name2.size() <= 16);
+
+	if (_name2.matchString("NISSND?") && ((_status.status & kFlagType9) != kFlag3)) {
 		s.syncAsUint32LE(_status.status);
 		s.syncAsUint32LE(_type);
 		s.syncAsUint32LE(_blockCount); // field_8;
@@ -393,6 +402,10 @@ SubtitleEntry::SubtitleEntry(LastExpressEngine *engine) : _engine(engine) {
 
 SubtitleEntry::~SubtitleEntry() {
 	SAFE_DELETE(_data);
+
+	// Zero-out passed pointers
+	_sound = NULL;
+	_engine = NULL;
 }
 
 void SubtitleEntry::load(Common::String filename, SoundEntry *soundEntry) {
@@ -423,6 +436,9 @@ void SubtitleEntry::loadData() {
 }
 
 void SubtitleEntry::setupAndDraw() {
+	if (!_sound)
+		error("[SubtitleEntry::setupAndDraw] Sound entry not initialized");
+
 	if (!_data) {
 		_data = new SubtitleManager(_engine->getFont());
 		_data->load(getArchive(_filename));

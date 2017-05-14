@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,6 +32,7 @@
 #include "common/keyboard.h"
 #include "common/system.h"
 #include "common/textconsole.h"
+#include "graphics/palette.h"
 #include "graphics/surface.h"
 #include "video/smk_decoder.h"
 
@@ -42,9 +43,6 @@ int Scene::DinoStartProc() {
 
 	playMovie("testvid.smk");
 
-	// HACK: Forcibly quit here
-	_vm->quitGame();
-
 	return SUCCESS;
 }
 
@@ -53,9 +51,6 @@ int Scene::FTA2StartProc() {
 
 	playMovie("trimark.smk");
 	playMovie("intro.smk");
-
-	// HACK: Forcibly quit here
-	_vm->quitGame();
 
 	return SUCCESS;
 }
@@ -92,7 +87,7 @@ int Scene::FTA2EndProc(FTA2Endings whichEnding) {
 }
 
 void Scene::playMovie(const char *filename) {
-	Video::SmackerDecoder *smkDecoder = new Video::SmackerDecoder(_vm->_mixer);
+	Video::SmackerDecoder *smkDecoder = new Video::SmackerDecoder();
 
 	if (!smkDecoder->loadFile(filename))
 		return;
@@ -101,14 +96,16 @@ void Scene::playMovie(const char *filename) {
 	uint16 y = (g_system->getHeight() - smkDecoder->getHeight()) / 2;
 	bool skipVideo = false;
 
+	smkDecoder->start();
+
 	while (!_vm->shouldQuit() && !smkDecoder->endOfVideo() && !skipVideo) {
 		if (smkDecoder->needsUpdate()) {
 			const Graphics::Surface *frame = smkDecoder->decodeNextFrame();
 			if (frame) {
-				_vm->_system->copyRectToScreen((byte *)frame->pixels, frame->pitch, x, y, frame->w, frame->h);
+				_vm->_system->copyRectToScreen(frame->getPixels(), frame->pitch, x, y, frame->w, frame->h);
 
 				if (smkDecoder->hasDirtyPalette())
-					smkDecoder->setSystemPalette();
+					_vm->_system->getPaletteManager()->setPalette(smkDecoder->getPalette(), 0, 256);
 
 				_vm->_system->updateScreen();
 			}

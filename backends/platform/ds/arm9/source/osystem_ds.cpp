@@ -16,7 +16,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 
@@ -280,7 +281,7 @@ void OSystem_DS::grabPalette(unsigned char *colors, uint start, uint num) {
 
 #define MISALIGNED16(ptr) (((u32) (ptr) & 1) != 0)
 
-void OSystem_DS::copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) {
+void OSystem_DS::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	if (!_graphicsEnable) return;
 	if (w <= 1) return;
 	if (h < 0) return;
@@ -296,7 +297,7 @@ void OSystem_DS::copyRectToScreen(const byte *buf, int pitch, int x, int y, int 
 	// to save a few pennies/euro cents on the hardware.
 
 	if (_frameBufferExists) {
-		bg = (u16 *)_framebuffer.pixels;
+		bg = (u16 *)_framebuffer.getPixels();
 		stride = _framebuffer.pitch;
 	} else {
 		bg = (u16 *)DS::get8BitBackBuffer();
@@ -455,7 +456,7 @@ void OSystem_DS::copyRectToScreen(const byte *buf, int pitch, int x, int y, int 
 
 				dmaCopyHalfWords(3, src, dest1, w);
 
-				if ((!_frameBufferExists) || (buf == _framebuffer.pixels)) {
+				if ((!_frameBufferExists) || (buf == _framebuffer.getPixels())) {
 					dmaCopyHalfWords(2, src, dest2, w);
 				}
 
@@ -476,7 +477,7 @@ void OSystem_DS::updateScreen() {
 		_frameBufferExists = false;
 
 		// Copy temp framebuffer back to screen
-		copyRectToScreen((byte *)_framebuffer.pixels, _framebuffer.pitch, 0, 0, _framebuffer.w, _framebuffer.h);
+		copyRectToScreen((byte *)_framebuffer.getPixels(), _framebuffer.pitch, 0, 0, _framebuffer.w, _framebuffer.h);
 	}
 
 	DS::displayMode16BitFlipBuffer();
@@ -509,13 +510,13 @@ void OSystem_DS::clearOverlay() {
 //	consolePrintf("clearovl\n");
 }
 
-void OSystem_DS::grabOverlay(OverlayColor *buf, int pitch) {
+void OSystem_DS::grabOverlay(void *buf, int pitch) {
 //	consolePrintf("grabovl\n")
 	u16 *start = DS::get16BitBackBuffer();
 
 	for (int y = 0; y < 200; y++) {
 		u16 *src = start + (y * 320);
-		u16 *dest = ((u16 *) (buf)) + (y * pitch);
+		u16 *dest = (u16 *)((u8 *)buf + (y * pitch));
 
 		for (int x = 0; x < 320; x++) {
 			*dest++ =  *src++;
@@ -524,9 +525,9 @@ void OSystem_DS::grabOverlay(OverlayColor *buf, int pitch) {
 
 }
 
-void OSystem_DS::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {
+void OSystem_DS::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
 	u16 *bg = (u16 *) DS::get16BitBackBuffer();
-	const u16 *src = (const u16 *) buf;
+	const u8 *source = (const u8 *)buf;
 
 //	if (x + w > 256) w = 256 - x;
 	//if (x + h > 256) h = 256 - y;
@@ -536,7 +537,7 @@ void OSystem_DS::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, in
 
 
 	for (int dy = y; dy < y + h; dy++) {
-
+		const u16 *src = (const u16 *)source;
 
 		// Slow but save copy:
 		for (int dx = x; dx < x + w; dx++) {
@@ -546,7 +547,7 @@ void OSystem_DS::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, in
 			//consolePrintf("%d,", *src);
 			src++;
 		}
-		src += (pitch - w);
+		source += pitch;
 
 		// Fast but broken copy: (why?)
 		/*
@@ -580,7 +581,7 @@ bool OSystem_DS::showMouse(bool visible) {
 void OSystem_DS::warpMouse(int x, int y) {
 }
 
-void OSystem_DS::setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, u32 keycolor, int targetCursorScale, const Graphics::PixelFormat *format) {
+void OSystem_DS::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, u32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
 	if ((w > 0) && (w < 64) && (h > 0) && (h < 64)) {
 		memcpy(_cursorImage, buf, w * h);
 		_cursorW = w;
@@ -588,7 +589,9 @@ void OSystem_DS::setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, i
 		_cursorHotX = hotspotX;
 		_cursorHotY = hotspotY;
 		_cursorKey = keycolor;
-		_cursorScale = targetCursorScale;
+		// TODO: The old target scales was saved, but never used. Should the
+		// new "do not scale" logic be implemented?
+		//_cursorScale = targetCursorScale;
 		refreshCursor();
 	}
 }
@@ -654,7 +657,7 @@ bool OSystem_DS::pollEvent(Common::Event &event) {
 	return false;
 }
 
-uint32 OSystem_DS::getMillis() {
+uint32 OSystem_DS::getMillis(bool skipRecord) {
 	return DS::getMillis();
 }
 
@@ -688,6 +691,7 @@ void OSystem_DS::getTimeAndDate(TimeDate &td) const {
 	td.tm_mday = t.tm_mday;
 	td.tm_mon = t.tm_mon;
 	td.tm_year = t.tm_year;
+	td.tm_wday = t.tm_wday;
 }
 
 FilesystemFactory *OSystem_DS::getFilesystemFactory() {
@@ -711,7 +715,7 @@ void OSystem_DS::deleteMutex(MutexRef mutex) {
 // and should be replaced by an AudioCDManager subclass,
 // see backends/audiocd/ and common/system.h
 
-bool OSystem_DS::openCD(int drive) {
+bool OSystem_DS::openCD() {
 	return DS::CD::checkCD();
 }
 
@@ -752,11 +756,8 @@ Graphics::Surface *OSystem_DS::createTempFrameBuffer() {
 
 	if (DS::isCpuScalerEnabled()) {
 
-		_framebuffer.pixels = DS::getScalerBuffer();
-		_framebuffer.w = DS::getGameWidth();
-		_framebuffer.h = DS::getGameHeight();
-		_framebuffer.pitch = DS::getGameWidth();
-		_framebuffer.format = Graphics::PixelFormat::createFormatCLUT8();
+		_framebuffer.init(DS::getGameWidth(), DS::getGameHeight(), DS::getGameWidth(),
+		                  DS::getScalerBuffer(), Graphics::PixelFormat::createFormatCLUT8());
 
 	} else {
 
@@ -777,11 +778,7 @@ Graphics::Surface *OSystem_DS::createTempFrameBuffer() {
 			dmaCopyHalfWords(3, srcLine, destLine, width);
 		}
 
-		_framebuffer.pixels = dest;
-		_framebuffer.w = width;
-		_framebuffer.h = height;
-		_framebuffer.pitch = width;
-		_framebuffer.format = Graphics::PixelFormat::createFormatCLUT8();
+		_framebuffer.init(width, height, width, dest, Graphics::PixelFormat::createFormatCLUT8());
 
 	}
 
@@ -795,8 +792,8 @@ Graphics::Surface *OSystem_DS::createTempFrameBuffer() {
 	for (int y = 0; y <  DS::getGameHeight(); y++) {
 		DC_FlushRange(image + (y * imageStrideInWords), DS::getGameWidth());
 		for (int x = 0; x < DS::getGameWidth() >> 1; x++) {
-			*(((u16 *) (_framebuffer.pixels)) + y * (DS::getGameWidth() >> 1) + x) = image[(y * imageStrideInWords) + x];
-//			*(((u16 *) (surf->pixels)) + y * (DS::getGameWidth() >> 1) + x) = image[y * imageStrideInWords + x];
+			*(((u16 *) (_framebuffer.getPixels())) + y * (DS::getGameWidth() >> 1) + x) = image[(y * imageStrideInWords) + x];
+//			*(((u16 *) (surf->getPixels())) + y * (DS::getGameWidth() >> 1) + x) = image[y * imageStrideInWords + x];
 		}
 	}*/
 

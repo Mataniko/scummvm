@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #ifndef GRAPHICS_FONTMAN_H
@@ -60,7 +61,9 @@ public:
 	const Font *getFontByName(const Common::String &name) const;
 
 	/**
-	 * Associates a font object with an 'name'
+	 * Associates a font object with an 'name'.
+	 * The FontManager takes ownership of the provided font object
+	 * and will delete it when necesssary.
 	 *
 	 * @param name	the name of the font
 	 * @param font	the font object
@@ -72,7 +75,6 @@ public:
 	 * Associates a BDF font object with an 'usage'. This is useful for platforms
 	 * with a screen DPI much larger than a regular desktop workstation.
 	 *
-	 * @param name	the name of the font
 	 * @param font	the font object
 	 * @return true on success, false on failure
 	 */
@@ -111,6 +113,7 @@ private:
 	~FontManager();
 
 	Common::HashMap<Common::String, const Font *> _fontMap;
+	Common::Array<const Font *> _ownedFonts;
 	Common::String _localizedFontName;
 };
 

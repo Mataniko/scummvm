@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -42,6 +42,10 @@ Meter::~Meter() {
 	delete _surface;
 }
 
+int32 Meter::getMaxValue() const {
+	return _maxValue;
+}
+
 int32 Meter::getValue() const {
 	return _value;
 }
@@ -59,22 +63,36 @@ void Meter::setMaxValue() {
 	setValue(_maxValue);
 }
 
-void Meter::increase(int32 n) {
+int32 Meter::increase(int32 n) {
+	if (n < 0)
+		return decrease(-n);
+
+	int32 overflow = MAX<int32>(0, (_value + n) - _maxValue);
+
 	int32 value = CLIP<int32>(_value + n, 0, _maxValue);
 	if (_value == value)
-		return;
+		return overflow;
 
 	_value = value;
 	_needUpdate = true;
+
+	return overflow;
 }
 
-void Meter::decrease(int32 n) {
+int32 Meter::decrease(int32 n) {
+	if (n < 0)
+		return increase(-n);
+
+	int32 underflow = -MIN<int32>(0, _value - n);
+
 	int32 value = CLIP<int32>(_value - n, 0, _maxValue);
 	if (_value == value)
-		return;
+		return underflow;
 
 	_value = value;
 	_needUpdate = true;
+
+	return underflow;
 }
 
 void Meter::draw(Surface &dest, int16 &left, int16 &top, int16 &right, int16 &bottom) {

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -39,9 +39,9 @@ uint32 var8;
  * @param objIdx Sprite description
  */
 void addToBGList(int16 objIdx) {
-	renderer->incrustSprite(g_cine->_objectTable[objIdx]);
-
 	createBgIncrustListElement(objIdx, 0);
+
+	renderer->incrustSprite(g_cine->_bgIncrustList.back());
 }
 
 /**
@@ -49,9 +49,9 @@ void addToBGList(int16 objIdx) {
  * @param objIdx Sprite description
  */
 void addSpriteFilledToBGList(int16 objIdx) {
-	renderer->incrustMask(g_cine->_objectTable[objIdx]);
-
 	createBgIncrustListElement(objIdx, 1);
+
+	renderer->incrustMask(g_cine->_bgIncrustList.back());
 }
 
 /**
@@ -103,9 +103,9 @@ void loadBgIncrustFromSave(Common::SeekableReadStream &fHandle) {
 		g_cine->_bgIncrustList.push_back(tmp);
 
 		if (tmp.param == 0) {
-			renderer->incrustSprite(g_cine->_objectTable[tmp.objIdx]);
+			renderer->incrustSprite(tmp);
 		} else {
-			renderer->incrustMask(g_cine->_objectTable[tmp.objIdx]);
+			renderer->incrustMask(tmp);
 		}
 	}
 }

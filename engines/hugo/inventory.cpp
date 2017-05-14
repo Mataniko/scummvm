@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,7 +44,8 @@ namespace Hugo {
 
 static const int kMaxDisp = (kXPix / kInvDx);       // Max icons displayable
 
-InventoryHandler::InventoryHandler(HugoEngine *vm) : _vm(vm), _invent(0) {
+InventoryHandler::InventoryHandler(HugoEngine *vm) : _vm(vm) {
+	_invent = nullptr;
 	_firstIconId = 0;
 	_inventoryState  = kInventoryOff;               // Inventory icon bar state
 	_inventoryHeight = 0;                           // Inventory icon bar pos
@@ -56,19 +57,20 @@ void InventoryHandler::setInventoryObjId(int16 objId) {
 	_inventoryObjId = objId;
 }
 
-void InventoryHandler::setInventoryState(istate_t state) {
+void InventoryHandler::setInventoryState(Istate state) {
 	_inventoryState = state;
 }
 
 void InventoryHandler::freeInvent() {
 	free(_invent);
+	_invent = nullptr;
 }
 
 int16 InventoryHandler::getInventoryObjId() const {
 	return _inventoryObjId;
 }
 
-istate_t InventoryHandler::getInventoryState() const {
+Istate InventoryHandler::getInventoryState() const {
 	return _inventoryState;
 }
 
@@ -137,8 +139,8 @@ void InventoryHandler::constructInventory(const int16 imageTotNumb, int displayN
  * Process required action for inventory
  * Returns objId under cursor (or -1) for INV_GET
  */
-int16 InventoryHandler::processInventory(const invact_t action, ...) {
-	debugC(1, kDebugInventory, "processInventory(invact_t action, ...)");
+int16 InventoryHandler::processInventory(const InvAct action, ...) {
+	debugC(1, kDebugInventory, "processInventory(InvAct action, ...)");
 
 	int16 imageNumb;                                // Total number of inventory items
 	int displayNumb;                                // Total number displayed/carried
@@ -208,7 +210,7 @@ int16 InventoryHandler::processInventory(const invact_t action, ...) {
  * Process inventory state machine
  */
 void InventoryHandler::runInventory() {
-	status_t &gameStatus = _vm->getGameStatus();
+	Status &gameStatus = _vm->getGameStatus();
 
 	debugC(1, kDebugInventory, "runInventory");
 
@@ -231,7 +233,7 @@ void InventoryHandler::runInventory() {
 			_vm->_screen->moveImage(_vm->_screen->getBackBuffer(), 0, 0, kXPix, kYPix, kXPix, _vm->_screen->getFrontBuffer(), 0, 0, kXPix);
 			_vm->_object->updateImages();           // Add objects back into display list for restore
 			_inventoryState = kInventoryOff;
-			gameStatus.viewState = kViewPlay;
+			gameStatus._viewState = kViewPlay;
 		}
 		break;
 	case kInventoryDown:                            // Icon bar moving down

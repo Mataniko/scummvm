@@ -8,22 +8,17 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	 See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
-
-#include "common/translation.h"
-
-#include "gui/dialog.h"
-#include "gui/widget.h"
 
 #include "tsage/tsage.h"
 #include "tsage/core.h"
@@ -88,7 +83,7 @@ RightClickDialog::~RightClickDialog() {
 
 void RightClickDialog::draw() {
 	// Save the covered background area
-	_savedArea = Surface_getArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
+	_savedArea = surfaceGetArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
 
 	// Draw the dialog image
 	g_globals->gfxManager().copyFrom(_surface, _bounds.left, _bounds.top);
@@ -163,7 +158,7 @@ void RightClickDialog::execute() {
 		}
 
 		g_system->delayMillis(10);
-		GLOBALS._screenSurface.updateScreen();
+		GLOBALS._screen.update();
 	}
 
 	// Deactivate the graphics manager used for the dialog
@@ -244,7 +239,7 @@ void AmmoBeltDialog::execute() {
 		}
 
 		g_system->delayMillis(10);
-		GLOBALS._screenSurface.updateScreen();
+		GLOBALS._screen.update();
 	}
 
 	_gfxManager.deactivate();
@@ -323,7 +318,7 @@ void AmmoBeltDialog::draw() {
 
 	if (!_savedArea) {
 		// Save the covered background area
-		_savedArea = Surface_getArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
+		_savedArea = surfaceGetArea(g_globals->_gfxManagerInstance.getSurface(), _bounds);
 	} else {
 		bounds.moveTo(0, 0);
 	}

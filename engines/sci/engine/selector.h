@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -63,6 +63,7 @@ struct SelectorCache {
 	Selector message; ///< Used by GetEvent
 	// edit
 	Selector play; ///< Play function (first function to be called)
+	Selector restore;
 	Selector number;
 	Selector handle;	///< Replaced by nodePtr in SCI1+
 	Selector nodePtr;	///< Replaces handle in SCI1+
@@ -135,23 +136,43 @@ struct SelectorCache {
 	Selector bitmap; // Used to hold the text bitmap for SCI32 texts
 
 	Selector plane;
-	Selector top;
-	Selector left;
-	Selector bottom;
-	Selector right;
-	Selector resX;
-	Selector resY;
+	Selector top, left, bottom, right;
+	Selector resX, resY;
 
 	Selector fore;
 	Selector back;
 	Selector skip;
 	Selector dimmed;
+	Selector borderColor;
+	Selector width;
 
 	Selector fixPriority;
 	Selector mirrored;
+	Selector visible;
 
+	Selector seenRect;
 	Selector useInsetRect;
 	Selector inTop, inLeft, inBottom, inRight;
+	Selector textTop, textLeft, textBottom, textRight;
+	Selector title, titleFont, titleFore, titleBack;
+
+	Selector magnifier;
+	Selector frameOut;
+	Selector casts; // needed for sync'ing screen items/planes with scripts, when our save/restore code is patched in (see GfxFrameout::syncWithScripts)
+	Selector setVol; // for GK2 volume sync on restore
+	Selector reSyncVol; // for Torin volume sync on restore
+	Selector set; // for LSL6hires subtitle sync
+	Selector clear; // for LSL6hires subtitle sync
+	Selector curPos; // for LSL6hires volume sync
+	Selector update; // for LSL6hires volume sync
+	Selector show; // for GK1 volume sync
+	Selector position; // for GK1 volume sync
+	Selector musicVolume; // for GK1 volume sync
+	Selector soundVolume; // for GK1 volume sync
+	Selector initialOff; // for GK2 volume sync
+	Selector setPos; // for Torin volume sync
+	Selector setSize; // for PQ4 volume sync
+	Selector displayValue; // for PQ:SWAT volume sync
 #endif
 };
 
@@ -170,7 +191,7 @@ struct SelectorCache {
  * SelectorCache and mapped in script.cpp.
  */
 reg_t readSelector(SegManager *segMan, reg_t object, Selector selectorId);
-#define readSelectorValue(segMan, _obj_, _slc_) (readSelector(segMan, _obj_, _slc_).offset)
+#define readSelectorValue(segMan, _obj_, _slc_) (readSelector(segMan, _obj_, _slc_).getOffset())
 
 /**
  * Writes a selector value to an object.
@@ -189,6 +210,16 @@ void writeSelector(SegManager *segMan, reg_t object, Selector selectorId, reg_t 
  */
 void invokeSelector(EngineState *s, reg_t object, int selectorId,
 	int k_argc, StackPtr k_argp, int argc = 0, const reg_t *argv = 0);
+
+#ifdef ENABLE_SCI32
+/**
+ * SCI32 set kInfoFlagViewVisible in the -info- selector if a certain
+ * range of properties was written to.
+ * This function checks if index is in the right range, and sets the flag
+ * on obj.-info- if it is.
+ */
+void updateInfoFlagViewVisible(Object *obj, int index, bool fromPropertyOp = false);
+#endif
 
 } // End of namespace Sci
 

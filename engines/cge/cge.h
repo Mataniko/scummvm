@@ -1,27 +1,27 @@
 /* ScummVM - Graphic Adventure Engine
-*
-* ScummVM is the legal property of its developers, whose names
-* are too numerous to list here. Please refer to the COPYRIGHT
-* file distributed with this source distribution.
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
+ *
+ * ScummVM is the legal property of its developers, whose names
+ * are too numerous to list here. Please refer to the COPYRIGHT
+ * file distributed with this source distribution.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ */
 
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
-
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-*
-*/
-
-#ifndef CGE_H
-#define CGE_H
+#ifndef CGE_CGE_H
+#define CGE_CGE_H
 
 #include "common/random.h"
 #include "common/savefile.h"
@@ -78,6 +78,8 @@ class Talk;
 #define kMapZCnt    20
 #define kMapTop     80
 
+#define kSayTheEnd  41
+
 // our engine debug channels
 enum {
 	kCGEDebugBitmap = 1 << 0,
@@ -99,7 +101,6 @@ struct SavegameHeader {
 	Graphics::Surface *thumbnail;
 	int saveYear, saveMonth, saveDay;
 	int saveHour, saveMinutes;
-	int totalFrames;
 };
 
 extern const char *savegameStr;
@@ -147,7 +148,6 @@ public:
 
 	const   ADGameDescription *_gameDescription;
 	int    _startupMode;
-	int    _demoText;
 	int    _oldLev;
 	int    _pocPtr;
 	bool   _music;
@@ -157,11 +157,10 @@ public:
 	bool   _flag[4];
 	bool   _dark;
 	bool   _game;
-	bool   _finis;
+	bool   _endGame;
 	int    _now;
 	int    _lev;
 	int    _mode;
-	int    _soundOk;
 	int    _gameCase2Cpt;
 	int    _offUseCount;
 	Dac   *_bitmapPalette;

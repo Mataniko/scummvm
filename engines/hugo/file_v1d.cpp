@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -55,11 +55,11 @@ void FileManager_v1d::closeDatabaseFiles() {
 /**
  * Open and read in an overlay file, close file
  */
-void FileManager_v1d::readOverlay(const int screenNum, image_pt image, const ovl_t overlayType) {
+void FileManager_v1d::readOverlay(const int screenNum, ImagePtr image, const OvlType overlayType) {
 	debugC(1, kDebugFile, "readOverlay(%d, ...)", screenNum);
 
-	const char *ovl_ext[] = {".b", ".o", ".ob"};
-	Common::String buf = Common::String(_vm->_text->getScreenNames(screenNum)) + Common::String(ovl_ext[overlayType]);
+	const char *ovlExt[] = {".b", ".o", ".ob"};
+	Common::String buf = Common::String(_vm->_text->getScreenNames(screenNum)) + Common::String(ovlExt[overlayType]);
 
 	if (!Common::File::exists(buf)) {
 		memset(image, 0, kOvlSize);
@@ -70,7 +70,7 @@ void FileManager_v1d::readOverlay(const int screenNum, image_pt image, const ovl
 	if (!_sceneryArchive1.open(buf))
 		error("File not found: %s", buf.c_str());
 
-	image_pt tmpImage = image;                      // temp ptr to overlay file
+	ImagePtr tmpImage = image;                      // temp ptr to overlay file
 
 	_sceneryArchive1.read(tmpImage, kOvlSize);
 	_sceneryArchive1.close();
@@ -87,7 +87,7 @@ void FileManager_v1d::readBackground(const int screenIndex) {
 	if (!_sceneryArchive1.open(buf))
 		error("File not found: %s", buf.c_str());
 	// Read the image into dummy seq and static dib_a
-	seq_t *dummySeq;                                // Image sequence structure for Read_pcx
+	Seq *dummySeq;                                // Image sequence structure for Read_pcx
 	dummySeq = readPCX(_sceneryArchive1, 0, _vm->_screen->getFrontBuffer(), true, _vm->_text->getScreenNames(screenIndex));
 	free(dummySeq);
 	_sceneryArchive1.close();

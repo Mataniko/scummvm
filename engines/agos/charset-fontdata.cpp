@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -681,6 +681,51 @@ static const byte feeble_windowFont[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
+void AGOSEngine_Feeble::windowDrawChar(WindowBlock *window, uint x, uint y, byte chr) {
+	const byte *src;
+	byte color, *dst;
+	uint dstPitch, h, w, i;
+
+	if (_noOracleScroll)
+		return;
+
+	_videoLockOut |= 0x8000;
+
+	dst = getBackGround();
+	dstPitch = _backGroundBuf->pitch;
+	h = 13;
+	w = getFeebleFontSize(chr);
+
+	if (_language == Common::PL_POL) {
+		if (!strcmp(getExtra(), "4CD"))
+			src = polish4CD_feeble_windowFont + (chr - 32) * 13;
+		else
+			src = polish2CD_feeble_windowFont + (chr - 32) * 13;
+	} else {
+		src = feeble_windowFont + (chr - 32) * 13;
+	}
+	dst += y * dstPitch + x + window->textColumnOffset;
+
+	color = window->textColor;
+
+	do {
+		int8 b = *src++;
+		i = 0;
+		do {
+			if (b < 0) {
+				if (dst[i] == 0)
+					dst[i] = color;
+			}
+
+			b <<= 1;
+		} while (++i != w);
+		dst += dstPitch;
+	} while (--h);
+
+	_videoLockOut &= ~0x8000;
+}
+#endif
+
 static const byte english_simon1AGAFontData[] = {
 	0x00,0x00,0x00,0x20,0x00,0x00,0x20,0x50,0x20,0x10,0x40,0x88,0x30,0x40,0x00,0x88,0x20,0x00,0x00,0x50,0x20,0x00,0x00,0x50,0x00,0x00,0x00,0x20,0x00,0x00,0x20,0x50,0x00,0x00,0x00,0x20,0x00,0x00,0x00,0x00,0x05,
 	0x00,0x00,0x00,0x30,0x00,0x10,0x20,0x48,0x10,0x20,0x00,0x48,0x20,0x40,0x00,0x90,0x00,0x00,0x00,0x60,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,
@@ -1252,51 +1297,6 @@ void AGOSEngine::renderString(uint vgaSpriteId, uint color, uint width, uint hei
 		}
 	}
 }
-
-void AGOSEngine_Feeble::windowDrawChar(WindowBlock *window, uint x, uint y, byte chr) {
-	const byte *src;
-	byte color, *dst;
-	uint dstPitch, h, w, i;
-
-	if (_noOracleScroll)
-		return;
-
-	_videoLockOut |= 0x8000;
-
-	dst = getBackGround();
-	dstPitch = _backGroundBuf->pitch;
-	h = 13;
-	w = getFeebleFontSize(chr);
-
-	if (_language == Common::PL_POL) {
-		if (!strcmp(getExtra(), "4CD"))
-			src = polish4CD_feeble_windowFont + (chr - 32) * 13;
-		else
-			src = polish2CD_feeble_windowFont + (chr - 32) * 13;
-	} else {
-		src = feeble_windowFont + (chr - 32) * 13;
-	}
-	dst += y * dstPitch + x + window->textColumnOffset;
-
-	color = window->textColor;
-
-	do {
-		int8 b = *src++;
-		i = 0;
-		do {
-			if (b < 0) {
-				if (dst[i] == 0)
-					dst[i] = color;
-			}
-
-			b <<= 1;
-		} while (++i != w);
-		dst += dstPitch;
-	} while (--h);
-
-	_videoLockOut &= ~0x8000;
-}
-#endif
 
 static const byte czech_simonFont[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -2924,7 +2924,7 @@ void AGOSEngine::windowDrawChar(WindowBlock *window, uint x, uint y, byte chr) {
 	Graphics::Surface *screen = _system->lockScreen();
 
 	if (getGameType() == GType_SIMON1 || getGameType() == GType_SIMON2) {
-		dst = (byte *)screen->pixels;
+		dst = (byte *)screen->getPixels();
 		dstPitch = screen->pitch;
 		h = 8;
 		w = 6;
@@ -2961,7 +2961,7 @@ void AGOSEngine::windowDrawChar(WindowBlock *window, uint x, uint y, byte chr) {
 			error("windowDrawChar: Unknown language %d", _language);
 		}
 	} else if (getGameType() == GType_ELVIRA2 || getGameType() == GType_WW) {
-		dst = (byte *)screen->pixels;
+		dst = (byte *)screen->getPixels();
 		dstPitch = screen->pitch;
 		h = 8;
 		w = 6;
@@ -2986,14 +2986,14 @@ void AGOSEngine::windowDrawChar(WindowBlock *window, uint x, uint y, byte chr) {
 			error("windowDrawChar: Unknown language %d", _language);
 		}
 	} else if (getGameType() == GType_ELVIRA1) {
-		dst = (byte *)screen->pixels;
+		dst = (byte *)screen->getPixels();
 		dstPitch = screen->pitch;
 		h = 8;
 		w = 6;
 
 		src = english_elvira1Font + (chr - 32) * 8;
 	} else {
-		dst = (byte *)screen->pixels;
+		dst = (byte *)screen->getPixels();
 		dstPitch = screen->pitch;
 		h = 8;
 		w = 8;

@@ -8,17 +8,19 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
+
+#if defined(GPH_DEVICE)
 
 // Disable symbol overrides so that we can use system headers.
 #define FORBIDDEN_SYMBOL_ALLOW_ALL
@@ -31,8 +33,6 @@
 #include "backends/plugins/posix/posix-provider.h"
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
-
-#include "base/main.h"
 
 #include "common/archive.h"
 #include "common/config-manager.h"
@@ -63,23 +63,6 @@ OSystem_GPH::OSystem_GPH()
 void OSystem_GPH::initBackend() {
 
 	assert(!_inited);
-
-	// Create the events manager
-	if (_eventSource == 0)
-		_eventSource = new GPHEventSource();
-
-	// Create the graphics manager
-	if (_graphicsManager == 0) {
-		_graphicsManager = new GPHGraphicsManager(_eventSource);
-	}
-
-	// Create the mixer manager
-	if (_mixer == 0) {
-		_mixerManager = new DoubleBufferSDLMixerManager();
-
-		// Setup and start mixer
-		_mixerManager->init();
-	}
 
 	/* Setup default save path to be workingdir/saves */
 
@@ -165,14 +148,40 @@ void OSystem_GPH::initBackend() {
 	/* Make sure that aspect ratio correction is enabled on the 1st run to stop
 	   users asking me what the 'wasted space' at the bottom is ;-). */
 	ConfMan.registerDefault("aspect_ratio", true);
+	ConfMan.registerDefault("fullscreen", true);
 
 	/* Make sure SDL knows that we have a joystick we want to use. */
 	ConfMan.setInt("joystick_num", 0);
+
+	// Create the events manager
+	if (_eventSource == 0)
+		_eventSource = new GPHEventSource();
+
+	// Create the graphics manager
+	if (_graphicsManager == 0) {
+		_graphicsManager = new GPHGraphicsManager(_eventSource, _window);
+	}
 
 	/* Pass to POSIX method to do the heavy lifting */
 	OSystem_POSIX::initBackend();
 
 	_inited = true;
+}
+
+void OSystem_GPH::initSDL() {
+	// Check if SDL has not been initialized
+	if (!_initedSDL) {
+
+		uint32 sdlFlags = SDL_INIT_EVENTTHREAD | SDL_INIT_VIDEO;
+		if (ConfMan.hasKey("disable_sdl_parachute"))
+			sdlFlags |= SDL_INIT_NOPARACHUTE;
+
+		// Initialize SDL (SDL Subsystems are initiliazed in the corresponding sdl managers)
+		if (SDL_Init(sdlFlags) == -1)
+			error("Could not initialize SDL: %s", SDL_GetError());
+
+		_initedSDL = true;
+	}
 }
 
 void OSystem_GPH::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {
@@ -222,3 +231,5 @@ void OSystem_GPH::quit() {
 
 	OSystem_POSIX::quit();
 }
+
+#endif

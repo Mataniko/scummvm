@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -244,6 +244,7 @@ void ScummEngine_v90he::o90_wizImageOps() {
 		_wizParams.box2.right = pop();
 		_wizParams.box2.top = pop();
 		_wizParams.box2.left = pop();
+		adjustRect(_wizParams.box2);
 		break;
 	case 134: // HE99+
 		_wizParams.processFlags |= kWPFFillColor | kWPFClipBox2;
@@ -253,6 +254,7 @@ void ScummEngine_v90he::o90_wizImageOps() {
 		_wizParams.box2.right = pop();
 		_wizParams.box2.top = pop();
 		_wizParams.box2.left = pop();
+		adjustRect(_wizParams.box2);
 		break;
 	case 135: // HE99+
 		_wizParams.processFlags |= kWPFFillColor | kWPFClipBox2;
@@ -260,6 +262,7 @@ void ScummEngine_v90he::o90_wizImageOps() {
 		_wizParams.fillColor = pop();
 		_wizParams.box2.top = _wizParams.box2.bottom = pop();
 		_wizParams.box2.left = _wizParams.box2.right = pop();
+		adjustRect(_wizParams.box2);
 		break;
 	case 136: // HE99+
 		_wizParams.processFlags |= kWPFFillColor | kWPFClipBox2;
@@ -267,6 +270,7 @@ void ScummEngine_v90he::o90_wizImageOps() {
 		_wizParams.fillColor = pop();
 		_wizParams.box2.top = _wizParams.box2.bottom = pop();
 		_wizParams.box2.left = _wizParams.box2.right = pop();
+		adjustRect(_wizParams.box2);
 		break;
 	case 137: // HE99+
 		_wizParams.processFlags |= kWPFDstResNum;
@@ -281,29 +285,29 @@ void ScummEngine_v90he::o90_wizImageOps() {
 		_wizParams.processMode = 13;
 		break;
 	case 142: // HE99+
-		_wizParams.field_239D = pop();
-		_wizParams.field_2399 = pop();
-		_wizParams.field_23A5 = pop();
-		_wizParams.field_23A1 = pop();
-		copyScriptString(_wizParams.string2, sizeof(_wizParams.string2));
 		_wizParams.processMode = 15;
+		_wizParams.fontProperties.bgColor = pop();
+		_wizParams.fontProperties.fgColor = pop();
+		_wizParams.fontProperties.size = pop();
+		_wizParams.fontProperties.style = pop();
+		copyScriptString(_wizParams.fontProperties.fontName, sizeof(_wizParams.fontProperties.fontName));
 		break;
 	case 143: // HE99+
 		_wizParams.processMode = 16;
-		_wizParams.field_23AD = pop();
-		_wizParams.field_23A9 = pop();
-		copyScriptString(_wizParams.string1, sizeof(_wizParams.string1));
+		_wizParams.fontProperties.yPos = pop();
+		_wizParams.fontProperties.xPos = pop();
+		copyScriptString(_wizParams.fontProperties.string, sizeof(_wizParams.fontProperties.string));
 		break;
 	case 189: // HE99+
 		_wizParams.processMode = 17;
-		_wizParams.field_23CD = pop();
-		_wizParams.field_23C9 = pop();
-		_wizParams.field_23C5 = pop();
-		_wizParams.field_23C1 = pop();
-		_wizParams.field_23BD = pop();
-		_wizParams.field_23B9 = pop();
-		_wizParams.field_23B5 = pop();
-		_wizParams.field_23B1 = pop();
+		_wizParams.ellipseProperties.color = pop();
+		_wizParams.ellipseProperties.lod = pop();
+		_wizParams.ellipseProperties.ky = pop();
+		_wizParams.ellipseProperties.kx = pop();
+		_wizParams.ellipseProperties.qy = pop();
+		_wizParams.ellipseProperties.qx = pop();
+		_wizParams.ellipseProperties.py = pop();
+		_wizParams.ellipseProperties.px = pop();
 		break;
 	case 196: // HE99+
 		_wizParams.processMode = 14;
@@ -1408,7 +1412,7 @@ void ScummEngine_v90he::o90_videoOps() {
 		memset(_videoParams.filename, 0, sizeof(_videoParams.filename));
 		_videoParams.status = 0;
 		_videoParams.flags = 0;
-		_videoParams.unk2 = pop();
+		_videoParams.number = pop();
 		_videoParams.wizResNum = 0;
 		break;
 	case 14:
@@ -1425,11 +1429,10 @@ void ScummEngine_v90he::o90_videoOps() {
 			if (_videoParams.flags == 0)
 				_videoParams.flags = 4;
 
-			const char *filename = (char *)_videoParams.filename + convertFilePath(_videoParams.filename, sizeof(_videoParams.filename));
 			if (_videoParams.flags & 2) {
-				VAR(119) = _moviePlay->load(filename, _videoParams.flags, _videoParams.wizResNum);
+				VAR(119) = _moviePlay->load(convertFilePath(_videoParams.filename), _videoParams.flags, _videoParams.wizResNum);
 			} else {
-				VAR(119) = _moviePlay->load(filename, _videoParams.flags);
+				VAR(119) = _moviePlay->load(convertFilePath(_videoParams.filename), _videoParams.flags);
 			}
 		} else if (_videoParams.status == 165) {
 			// Stop video
@@ -1488,6 +1491,7 @@ void ScummEngine_v90he::o90_floodFill() {
 		_floodFillParams.box.top = 0;
 		_floodFillParams.box.right = 639;
 		_floodFillParams.box.bottom = 479;
+		adjustRect(_floodFillParams.box);
 		break;
 	case 65:
 		_floodFillParams.y = pop();
@@ -1501,6 +1505,7 @@ void ScummEngine_v90he::o90_floodFill() {
 		_floodFillParams.box.right = pop();
 		_floodFillParams.box.top = pop();
 		_floodFillParams.box.left = pop();
+		adjustRect(_floodFillParams.box);
 		break;
 	case 255:
 		floodFill(&_floodFillParams, this);
@@ -1666,7 +1671,7 @@ void ScummEngine_v90he::o90_getPolygonOverlap() {
 		{
 			Common::Rect r2;
 			_sprite->getSpriteBounds(args2[0], false, r2);
-			Common::Rect r1(args1[0], args1[1], args1[2], args1[3]);
+			Common::Rect r1(args1[0], args1[1], args1[2] + 1, args1[3] + 1);
 			if (r2.isValidRect() == false) {
 				push(0);
 				break;
@@ -1711,7 +1716,7 @@ void ScummEngine_v90he::o90_getPolygonOverlap() {
 		{
 			Common::Rect r2;
 			_sprite->getSpriteBounds(args2[0], true, r2);
-			Common::Rect r1(args1[0], args1[1], args1[2], args1[3]);
+			Common::Rect r1(args1[0], args1[1], args1[2] + 1, args1[3] + 1);
 			if (r2.isValidRect() == false) {
 				push(0);
 				break;
@@ -2373,8 +2378,8 @@ void ScummEngine_v90he::o90_kernelSetFunctions() {
 	case 2001:
 		_logicHE->dispatch(args[1], num - 2, (int32 *)&args[2]);
 		break;
-	case 201102:
-		// Used in puttzoo iOS
+	case 201102: // Used in puttzoo iOS
+	case 20111014: // Used in spyfox iOS
 		break;
 	default:
 		error("o90_kernelSetFunctions: default case %d (param count %d)", args[0], num);

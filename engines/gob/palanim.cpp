@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -75,47 +75,28 @@ bool PalAnim::fadeStepColor(int color) {
 
 bool PalAnim::fadeStep(int16 oper) {
 	bool stop = true;
-	byte newRed;
-	byte newGreen;
-	byte newBlue;
 
 	if (oper == 0) {
-		if (_vm->_global->_setAllPalette) {
-			if (_vm->_global->_inVM != 0)
-				error("PalAnim::fadeStep(): _vm->_global->_inVM != 0 not supported");
+		int colorCount = _vm->_global->_setAllPalette ? _vm->_global->_colorCount : 256;
 
-			for (int i = 0; i < 256; i++) {
-				newRed = fadeColor(_vm->_global->_redPalette[i], _toFadeRed[i]);
-				newGreen = fadeColor(_vm->_global->_greenPalette[i], _toFadeGreen[i]);
-				newBlue = fadeColor(_vm->_global->_bluePalette[i], _toFadeBlue[i]);
+		for (int i = 0; i < colorCount; i++) {
+			byte newRed   = fadeColor(_vm->_global->_redPalette  [i], _toFadeRed  [i]);
+			byte newGreen = fadeColor(_vm->_global->_greenPalette[i], _toFadeGreen[i]);
+			byte newBlue  = fadeColor(_vm->_global->_bluePalette [i], _toFadeBlue [i]);
 
-				if ((_vm->_global->_redPalette[i] != newRed) ||
-				    (_vm->_global->_greenPalette[i] != newGreen) ||
-				    (_vm->_global->_bluePalette[i] != newBlue)) {
+			if ((_vm->_global->_redPalette  [i] != newRed  ) ||
+					(_vm->_global->_greenPalette[i] != newGreen) ||
+					(_vm->_global->_bluePalette [i] != newBlue)) {
 
-					_vm->_video->setPalElem(i, newRed, newGreen, newBlue, 0, 0x13);
+				_vm->_video->setPalElem(i, newRed, newGreen, newBlue, 0, 0x13);
 
-					_vm->_global->_redPalette[i] = newRed;
-					_vm->_global->_greenPalette[i] = newGreen;
-					_vm->_global->_bluePalette[i] = newBlue;
-					stop = false;
-				}
-			}
-		} else {
-			for (int i = 0; i < 16; i++) {
-
-				_vm->_video->setPalElem(i,
-						fadeColor(_vm->_global->_redPalette[i], _toFadeRed[i]),
-						fadeColor(_vm->_global->_greenPalette[i], _toFadeGreen[i]),
-						fadeColor(_vm->_global->_bluePalette[i], _toFadeBlue[i]),
-						-1, _vm->_global->_videoMode);
-
-				if ((_vm->_global->_redPalette[i] != _toFadeRed[i]) ||
-				    (_vm->_global->_greenPalette[i] != _toFadeGreen[i]) ||
-				    (_vm->_global->_bluePalette[i] != _toFadeBlue[i]))
-					stop = false;
+				_vm->_global->_redPalette  [i] = newRed;
+				_vm->_global->_greenPalette[i] = newGreen;
+				_vm->_global->_bluePalette [i] = newBlue;
+				stop = false;
 			}
 		}
+
 	} else if ((oper > 0) && (oper < 4))
 		stop = fadeStepColor(oper - 1);
 
@@ -124,44 +105,18 @@ bool PalAnim::fadeStep(int16 oper) {
 
 void PalAnim::fade(Video::PalDesc *palDesc, int16 fadeV, int16 allColors) {
 	bool stop;
-	int16 i;
 
 	if (_vm->shouldQuit())
 		return;
 
 	_fadeValue = (fadeV < 0) ? -fadeV : 2;
 
-	if (!_vm->_global->_setAllPalette) {
-		if (!palDesc) {
-			for (i = 0; i < 16; i++) {
-				_toFadeRed[i] = 0;
-				_toFadeGreen[i] = 0;
-				_toFadeBlue[i] = 0;
-			}
-		} else {
-			for (i = 0; i < 16; i++) {
-				_toFadeRed[i] = palDesc->vgaPal[i].red;
-				_toFadeGreen[i] = palDesc->vgaPal[i].green;
-				_toFadeBlue[i] = palDesc->vgaPal[i].blue;
-			}
-		}
-	} else {
-		if (_vm->_global->_inVM != 0)
-			error("PalAnim::fade(): _vm->_global->_inVM != 0 is not supported");
+	int colorCount = _vm->_global->_setAllPalette ? _vm->_global->_colorCount : 256;
 
-		if (!palDesc) {
-			for (i = 0; i < 256; i++) {
-				_toFadeRed[i] = 0;
-				_toFadeGreen[i] = 0;
-				_toFadeBlue[i] = 0;
-			}
-		} else {
-			for (i = 0; i < 256; i++) {
-				_toFadeRed[i] = palDesc->vgaPal[i].red;
-				_toFadeGreen[i] = palDesc->vgaPal[i].green;
-				_toFadeBlue[i] = palDesc->vgaPal[i].blue;
-			}
-		}
+	for (int i = 0; i < colorCount; i++) {
+		_toFadeRed  [i] = (palDesc == 0) ? 0 : palDesc->vgaPal[i].red;
+		_toFadeGreen[i] = (palDesc == 0) ? 0 : palDesc->vgaPal[i].green;
+		_toFadeBlue [i] = (palDesc == 0) ? 0 : palDesc->vgaPal[i].blue;
 	}
 
 	if (allColors == 0) {

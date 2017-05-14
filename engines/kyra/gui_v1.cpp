@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -69,8 +69,6 @@ void GUI_v1::initMenuLayout(Menu &menu) {
 
 void GUI_v1::initMenu(Menu &menu) {
 	_menuButtonList = 0;
-
-	_screen->hideMouse();
 
 	int textX;
 	int textY;
@@ -192,7 +190,6 @@ void GUI_v1::initMenu(Menu &menu) {
 		updateMenuButton(scrollDownButton);
 	}
 
-	_screen->showMouse();
 	_screen->updateScreen();
 }
 
@@ -203,7 +200,7 @@ void GUI_v1::processHighlights(Menu &menu) {
 	int mouseY = p.y;
 
 	if (_vm->game() == GI_LOL && menu.highlightedItem != 255) {
-		// LoL doesnt't have default highlighted items.
+		// LoL doesn't have default highlighted items.
 		// We use a highlightedItem value of 255 for this.
 
 		// With LoL no highlighting should take place unless the
@@ -309,10 +306,8 @@ void GUI_v1::updateMenuButton(Button *button) {
 	if (!_displayMenu)
 		return;
 
-	_screen->hideMouse();
 	updateButton(button);
 	_screen->updateScreen();
-	_screen->showMouse();
 }
 
 void GUI_v1::updateButton(Button *button) {
@@ -340,12 +335,10 @@ int GUI_v1::redrawButtonCallback(Button *button) {
 	if (!_displayMenu)
 		return 0;
 
-	_screen->hideMouse();
 	if (_vm->gameFlags().platform == Common::kPlatformAmiga)
 		_screen->drawBox(button->x + 1, button->y + 1, button->x + button->width - 1, button->y + button->height - 1, 17);
 	else
 		_screen->drawBox(button->x + 1, button->y + 1, button->x + button->width - 1, button->y + button->height - 1, 0xF8);
-	_screen->showMouse();
 
 	return 0;
 }
@@ -354,12 +347,10 @@ int GUI_v1::redrawShadedButtonCallback(Button *button) {
 	if (!_displayMenu)
 		return 0;
 
-	_screen->hideMouse();
 	if (_vm->gameFlags().platform == Common::kPlatformAmiga)
 		_screen->drawShadedBox(button->x, button->y, button->x + button->width, button->y + button->height, 31, 18);
 	else
 		_screen->drawShadedBox(button->x, button->y, button->x + button->width, button->y + button->height, 0xF9, 0xFA);
-	_screen->showMouse();
 
 	return 0;
 }

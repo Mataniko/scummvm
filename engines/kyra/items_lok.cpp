@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -29,9 +29,9 @@ namespace Kyra {
 
 int KyraEngine_LoK::findDuplicateItemShape(int shape) {
 	static const uint8 dupTable[] = {
-		0x48, 0x46, 0x49, 0x47, 0x4a, 0x46, 0x4b, 0x47,
-		0x4c, 0x46, 0x4d, 0x47, 0x5b, 0x5a, 0x5c, 0x5a,
-		0x5d, 0x5a, 0x5e, 0x5a, 0xFF, 0xFF
+		0x48, 0x46, 0x49, 0x47, 0x4A, 0x46, 0x4B, 0x47,
+		0x4C, 0x46, 0x4D, 0x47, 0x5B, 0x5A, 0x5C, 0x5A,
+		0x5D, 0x5A, 0x5E, 0x5A, 0xFF, 0xFF
 	};
 
 	int i = 0;
@@ -163,17 +163,13 @@ void KyraEngine_LoK::placeItemInGenericMapScene(int item, int index) {
 }
 
 void KyraEngine_LoK::setHandItem(Item item) {
-	_screen->hideMouse();
 	setMouseItem(item);
 	_itemInHand = item;
-	_screen->showMouse();
 }
 
 void KyraEngine_LoK::removeHandItem() {
-	_screen->hideMouse();
 	_screen->setMouseCursor(1, 1, _shapes[0]);
 	_itemInHand = kItemNone;
-	_screen->showMouse();
 }
 
 void KyraEngine_LoK::setMouseItem(Item item) {
@@ -415,7 +411,6 @@ int KyraEngine_LoK::processItemDrop(uint16 sceneId, uint8 item, int x, int y, in
 }
 
 void KyraEngine_LoK::exchangeItemWithMouseItem(uint16 sceneId, int itemIndex) {
-	_screen->hideMouse();
 	_animator->animRemoveGameItem(itemIndex);
 	assert(sceneId < _roomTableSize);
 	Room *currentRoom = &_roomTable[sceneId];
@@ -432,7 +427,6 @@ void KyraEngine_LoK::exchangeItemWithMouseItem(uint16 sceneId, int itemIndex) {
 		updateSentenceCommand(_itemList[getItemListIndex(_itemInHand)], _takenList[0], 179);
 	else
 		updateSentenceCommand(_itemList[getItemListIndex(_itemInHand)], _takenList[1], 179);
-	_screen->showMouse();
 	clickEventHandler2();
 }
 
@@ -720,9 +714,7 @@ void KyraEngine_LoK::magicOutMouseItem(int animIndex, int itemPos) {
 		_itemInHand = kItemNone;
 	} else {
 		_characterList[0].inventoryItems[itemPos] = kItemNone;
-		_screen->hideMouse();
 		_screen->fillRect(_itemPosX[itemPos], _itemPosY[itemPos], _itemPosX[itemPos] + 15, _itemPosY[itemPos] + 15, _flags.platform == Common::kPlatformAmiga ? 19 : 12, 0);
-		_screen->showMouse();
 	}
 
 	_screen->showMouse();
@@ -793,9 +785,7 @@ void KyraEngine_LoK::magicInMouseItem(int animIndex, int item, int itemPos) {
 		_itemInHand = item;
 	} else {
 		_characterList[0].inventoryItems[itemPos] = item;
-		_screen->hideMouse();
 		_screen->drawShape(0, _shapes[216 + item], _itemPosX[itemPos], _itemPosY[itemPos], 0, 0);
-		_screen->showMouse();
 	}
 	_screen->showMouse();
 	_screen->_curPage = videoPageBackUp;
@@ -846,9 +836,7 @@ void KyraEngine_LoK::updatePlayerItemsForScene() {
 		++_itemInHand;
 		if (_itemInHand > 33)
 			_itemInHand = 33;
-		_screen->hideMouse();
 		_screen->setMouseCursor(8, 15, _shapes[216 + _itemInHand]);
-		_screen->showMouse();
 	}
 
 	bool redraw = false;
@@ -856,17 +844,13 @@ void KyraEngine_LoK::updatePlayerItemsForScene() {
 		uint8 item = _currentCharacter->inventoryItems[i];
 		if (item >= 29 && item < 33) {
 			++item;
-			if (item > 33)
-				item = 33;
 			_currentCharacter->inventoryItems[i] = item;
 			redraw = true;
 		}
 	}
 
 	if (redraw) {
-		_screen->hideMouse();
 		redrawInventory(0);
-		_screen->showMouse();
 	}
 
 	if (_itemInHand == 33)
@@ -884,7 +868,6 @@ void KyraEngine_LoK::updatePlayerItemsForScene() {
 void KyraEngine_LoK::redrawInventory(int page) {
 	int videoPageBackUp = _screen->_curPage;
 	_screen->_curPage = page;
-	_screen->hideMouse();
 	for (int i = 0; i < 10; ++i) {
 		_screen->fillRect(_itemPosX[i], _itemPosY[i], _itemPosX[i] + 15, _itemPosY[i] + 15, _flags.platform == Common::kPlatformAmiga ? 19 : 12, page);
 
@@ -893,7 +876,6 @@ void KyraEngine_LoK::redrawInventory(int page) {
 			_screen->drawShape(page, _shapes[216 + item], _itemPosX[i], _itemPosY[i], 0, 0);
 		}
 	}
-	_screen->showMouse();
 	_screen->_curPage = videoPageBackUp;
 	_screen->updateScreen();
 }

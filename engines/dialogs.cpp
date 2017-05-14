@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "base/version.h"
@@ -42,13 +43,13 @@
 #include "engines/engine.h"
 #include "engines/metaengine.h"
 
-#ifdef SMALL_SCREEN_DEVICE
+#ifdef GUI_ENABLE_KEYSDIALOG
 #include "gui/KeysDialog.h"
 #endif
 
 class ConfigDialog : public GUI::OptionsDialog {
 protected:
-#ifdef SMALL_SCREEN_DEVICE
+#ifdef GUI_ENABLE_KEYSDIALOG
 	GUI::Dialog		*_keysDialog;
 #endif
 
@@ -111,10 +112,8 @@ MainMenuDialog::MainMenuDialog(Engine *engine)
 
 	_aboutDialog = new GUI::AboutDialog();
 	_optionsDialog = new ConfigDialog(_engine->hasFeature(Engine::kSupportsSubtitleOptions));
-	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"));
-	_loadDialog->setSaveMode(false);
-	_saveDialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"));
-	_saveDialog->setSaveMode(true);
+	_loadDialog = new GUI::SaveLoadChooser(_("Load game:"), _("Load"), false);
+	_saveDialog = new GUI::SaveLoadChooser(_("Save game:"), _("Save"), true);
 }
 
 MainMenuDialog::~MainMenuDialog() {
@@ -216,35 +215,27 @@ void MainMenuDialog::reflowLayout() {
 }
 
 void MainMenuDialog::save() {
-	const Common::String gameId = ConfMan.get("gameid");
+	int slot = _saveDialog->runModalWithCurrentTarget();
 
-	const EnginePlugin *plugin = 0;
-	EngineMan.findGame(gameId, &plugin);
-
-	int slot = _saveDialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+	#if defined(__PLAYSTATION2__) && defined(DYNAMIC_MODULES)
+	char pokeme[32];
+	snprintf(pokeme,32,"hack");
+	#endif
 
 	if (slot >= 0) {
 		Common::String result(_saveDialog->getResultString());
 		if (result.empty()) {
 			// If the user was lazy and entered no save name, come up with a default name.
-			#if defined(USE_SAVEGAME_TIMESTAMP)
-			TimeDate curTime;
-			g_system->getTimeAndDate(curTime);
-			curTime.tm_year += 1900; // fixup year
-			curTime.tm_mon++; // fixup month
-			result = Common::String::format("%04d.%02d.%02d / %02d:%02d:%02d", curTime.tm_year, curTime.tm_mon, curTime.tm_mday, curTime.tm_hour, curTime.tm_min, curTime.tm_sec);
-			#else
-			result = Common::String::format("Save %d", slot + 1);
-			#endif
+			result = _saveDialog->createDefaultSaveDescription(slot);
 		}
 
 		Common::Error status = _engine->saveGameState(slot, result);
 		if (status.getCode() != Common::kNoError) {
-			Common::String failMessage = Common::String::format(_("Gamestate save failed (%s)! "
+			Common::String failMessage = Common::String::format(_("Failed to save game (%s)! "
 				  "Please consult the README for basic information, and for "
 				  "instructions on how to obtain further assistance."), status.getDesc().c_str());
 			GUI::MessageDialog dialog(failMessage);
-			dialog.runModal();			
+			dialog.runModal();
 		}
 
 		close();
@@ -252,12 +243,7 @@ void MainMenuDialog::save() {
 }
 
 void MainMenuDialog::load() {
-	const Common::String gameId = ConfMan.get("gameid");
-
-	const EnginePlugin *plugin = 0;
-	EngineMan.findGame(gameId, &plugin);
-
-	int slot = _loadDialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
+	int slot = _loadDialog->runModalWithCurrentTarget();
 
 	_engine->setGameToLoadSlot(slot);
 
@@ -321,14 +307,14 @@ ConfigDialog::ConfigDialog(bool subtitleControls)
 	new GUI::ButtonWidget(this, "GlobalConfig.Ok", _("~O~K"), 0, GUI::kOKCmd);
 	new GUI::ButtonWidget(this, "GlobalConfig.Cancel", _("~C~ancel"), 0, GUI::kCloseCmd);
 
-#ifdef SMALL_SCREEN_DEVICE
+#ifdef GUI_ENABLE_KEYSDIALOG
 	new GUI::ButtonWidget(this, "GlobalConfig.Keys", _("~K~eys"), 0, kKeysCmd);
 	_keysDialog = NULL;
 #endif
 }
 
 ConfigDialog::~ConfigDialog() {
-#ifdef SMALL_SCREEN_DEVICE
+#ifdef GUI_ENABLE_KEYSDIALOG
 	delete _keysDialog;
 #endif
 }
@@ -337,7 +323,7 @@ void ConfigDialog::handleCommand(GUI::CommandSender *sender, uint32 cmd, uint32 
 	switch (cmd) {
 	case kKeysCmd:
 
-#ifdef SMALL_SCREEN_DEVICE
+#ifdef GUI_ENABLE_KEYSDIALOG
 	//
 	// Create the sub dialog(s)
 	//

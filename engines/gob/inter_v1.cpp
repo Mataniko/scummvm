@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -286,10 +286,40 @@ void Inter_v1::o1_loadMult() {
 }
 
 void Inter_v1::o1_playMult() {
-	int16 checkEscape;
+	// NOTE: The EGA version of Gobliiins has an MDY tune.
+	//       While the original doesn't play it, we do.
+	bool isGob1EGAIntro = _vm->getGameType() == kGameTypeGob1  &&
+	                      _vm->isEGA()                         &&
+	                      _vm->_game->_script->pos() == 1010   &&
+	                      _vm->isCurrentTot("intro.tot")       &&
+	                      VAR(57) != 0xFFFFFFFF                &&
+	                      _vm->_dataIO->hasFile("goblins.mdy") &&
+	                      _vm->_dataIO->hasFile("goblins.tbr");
 
-	checkEscape = _vm->_game->_script->readInt16();
+	int16 checkEscape = _vm->_game->_script->readInt16();
+
+	if (isGob1EGAIntro) {
+		_vm->_sound->adlibLoadTBR("goblins.tbr");
+		_vm->_sound->adlibLoadMDY("goblins.mdy");
+		_vm->_sound->adlibSetRepeating(-1);
+
+		_vm->_sound->adlibPlay();
+	}
+
 	_vm->_mult->playMult(VAR(57), -1, checkEscape, 0);
+
+	if (isGob1EGAIntro) {
+
+		// User didn't escape the intro mult, wait for an escape here
+		if (VAR(57) != 0xFFFFFFFF) {
+			while (_vm->_util->getKey() != kKeyEscape) {
+				_vm->_util->processInput();
+				_vm->_util->longDelay(1);
+			}
+		}
+
+		_vm->_sound->adlibUnload();
+	}
 }
 
 void Inter_v1::o1_freeMultKeys() {
@@ -1094,8 +1124,6 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 			_vm->_draw->_vgaPalette[i].green = _vm->_game->_script->readByte();
 			_vm->_draw->_vgaPalette[i].blue  = _vm->_game->_script->readByte();
 		}
-
-		memcpy(_vm->_draw->_vgaSmallPalette, _vm->_draw->_vgaPalette, 16 * 3);
 		break;
 
 	case 53:
@@ -1153,32 +1181,21 @@ void Inter_v1::o1_palLoad(OpFuncParams &params) {
 			_vm->_palAnim->fade(_vm->_global->_pPaletteDesc, 0, 0);
 			return;
 		}
-		_vm->_global->_pPaletteDesc->vgaPal = _vm->_draw->_vgaSmallPalette;
+		_vm->_global->_pPaletteDesc->vgaPal = _vm->_draw->_vgaPalette;
 		_vm->_palAnim->fade(_vm->_global->_pPaletteDesc, 0, 0);
 	}
 }
 
 void Inter_v1::o1_keyFunc(OpFuncParams &params) {
-	static uint32 lastCalled = 0;
-	int16 cmd;
-	int16 key;
-	uint32 now;
-
 	if (!_vm->_vidPlayer->isPlayingLive()) {
 		_vm->_draw->forceBlit();
 		_vm->_video->retrace();
 	}
 
-	cmd = _vm->_game->_script->readInt16();
 	animPalette();
 	_vm->_draw->blitInvalidated();
 
-	now = _vm->_util->getTimeKey();
-	if (!_noBusyWait)
-		if ((now - lastCalled) <= 20)
-			_vm->_util->longDelay(1);
-	lastCalled = now;
-	_noBusyWait = false;
+	handleBusyWait();
 
 	// WORKAROUND for bug #1726130: Ween busy-waits in the intro for a counter
 	// to become 5000. We deliberately slow down busy-waiting, so we shorten
@@ -1186,6 +1203,9 @@ void Inter_v1::o1_keyFunc(OpFuncParams &params) {
 	if ((_vm->getGameType() == kGameTypeWeen) && (VAR(59) < 4000) &&
 	    (_vm->_game->_script->pos() == 729) && _vm->isCurrentTot("intro5.tot"))
 		WRITE_VAR(59, 4000);
+
+	int16 cmd = _vm->_game->_script->readInt16();
+	int16 key;
 
 	switch (cmd) {
 	case -1:
@@ -1554,14 +1574,13 @@ void Inter_v1::o1_waitEndPlay(OpFuncParams &params) {
 }
 
 void Inter_v1::o1_playComposition(OpFuncParams &params) {
-	int16 composition[50];
-	int16 dataVar;
-	int16 freqVal;
+	int16 dataVar = _vm->_game->_script->readVarIndex();
+	int16 freqVal = _vm->_game->_script->readValExpr();
 
-	dataVar = _vm->_game->_script->readVarIndex();
-	freqVal = _vm->_game->_script->readValExpr();
+	int16 composition[50];
+	int maxEntries = MIN<int>(50, (_variables->getSize() - dataVar) / 4);
 	for (int i = 0; i < 50; i++)
-		composition[i] = (int16) VAR_OFFSET(dataVar + i * 4);
+		composition[i] = (i < maxEntries) ? ((int16) VAR_OFFSET(dataVar + i * 4)) : -1;
 
 	_vm->_sound->blasterPlayComposition(composition, freqVal);
 }
@@ -1744,10 +1763,15 @@ void Inter_v1::o1_writeData(OpFuncParams &params) {
 void Inter_v1::o1_manageDataFile(OpFuncParams &params) {
 	Common::String file = _vm->_game->_script->evalString();
 
-	if (!file.empty())
+	if (!file.empty()) {
 		_vm->_dataIO->openArchive(file, true);
-	else
+	} else {
 		_vm->_dataIO->closeArchive(true);
+
+		// NOTE: Lost in Time might close a data file without explicitely closing a video in it.
+		//       So we make sure that all open videos are still available.
+		_vm->_vidPlayer->reopenAll();
+	}
 }
 
 void Inter_v1::o1_setState(OpGobParams &params) {
@@ -2463,21 +2487,21 @@ void Inter_v1::animPalette() {
 	_vm->_video->waitRetrace();
 
 	if (_animPalDir[0] == -1) {
-		col = _vm->_draw->_vgaSmallPalette[_animPalLowIndex[0]];
+		col = _vm->_draw->_vgaPalette[_animPalLowIndex[0]];
 
 		for (i = _animPalLowIndex[0]; i < _animPalHighIndex[0]; i++)
-			_vm->_draw->_vgaSmallPalette[i] = _vm->_draw->_vgaSmallPalette[i + 1];
+			_vm->_draw->_vgaPalette[i] = _vm->_draw->_vgaPalette[i + 1];
 
-		_vm->_draw->_vgaSmallPalette[_animPalHighIndex[0]] = col;
+		_vm->_draw->_vgaPalette[_animPalHighIndex[0]] = col;
 	} else {
-		col = _vm->_draw->_vgaSmallPalette[_animPalHighIndex[0]];
+		col = _vm->_draw->_vgaPalette[_animPalHighIndex[0]];
 		for (i = _animPalHighIndex[0]; i > _animPalLowIndex[0]; i--)
-			_vm->_draw->_vgaSmallPalette[i] = _vm->_draw->_vgaSmallPalette[i - 1];
+			_vm->_draw->_vgaPalette[i] = _vm->_draw->_vgaPalette[i - 1];
 
-		_vm->_draw->_vgaSmallPalette[_animPalLowIndex[0]] = col;
+		_vm->_draw->_vgaPalette[_animPalLowIndex[0]] = col;
 	}
 
-	_vm->_global->_pPaletteDesc->vgaPal = _vm->_draw->_vgaSmallPalette;
+	_vm->_global->_pPaletteDesc->vgaPal = _vm->_draw->_vgaPalette;
 	_vm->_video->setFullPalette(_vm->_global->_pPaletteDesc);
 }
 

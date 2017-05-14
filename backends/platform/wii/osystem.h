@@ -8,15 +8,16 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
  */
 
 #ifndef _WII_OSYSTEM_H_
@@ -56,7 +57,7 @@ class OSystem_Wii : public EventsBaseBackend, public PaletteManager {
 private:
 	s64 _startup_time;
 
-	int _cursorScale;
+	bool _cursorDontScale;
 	bool _cursorPaletteDisabled;
 	u16 *_cursorPalette;
 	bool _cursorPaletteDirty;
@@ -72,7 +73,7 @@ private:
 	bool _overlayVisible;
 	u16 _overlayWidth, _overlayHeight;
 	u32 _overlaySize;
-	OverlayColor *_overlayPixels;
+	uint16 *_overlayPixels;
 	gfx_screen_coords_t _coordsOverlay;
 	gfx_tex_t _texOverlay;
 	bool _overlayDirty;
@@ -167,7 +168,7 @@ protected:
 	virtual void grabPalette(byte *colors, uint start, uint num);
 public:
 	virtual void setCursorPalette(const byte *colors, uint start, uint num);
-	virtual void copyRectToScreen(const byte *buf, int pitch, int x, int y,
+	virtual void copyRectToScreen(const void *buf, int pitch, int x, int y,
 									int w, int h);
 	virtual void updateScreen();
 	virtual Graphics::Surface *lockScreen();
@@ -177,8 +178,8 @@ public:
 	virtual void showOverlay();
 	virtual void hideOverlay();
 	virtual void clearOverlay();
-	virtual void grabOverlay(OverlayColor *buf, int pitch);
-	virtual void copyRectToOverlay(const OverlayColor *buf, int pitch,
+	virtual void grabOverlay(void *buf, int pitch);
+	virtual void copyRectToOverlay(const void *buf, int pitch,
 									int x, int y, int w, int h);
 	virtual int16 getOverlayWidth();
 	virtual int16 getOverlayHeight();
@@ -187,13 +188,13 @@ public:
 	virtual bool showMouse(bool visible);
 
 	virtual void warpMouse(int x, int y);
-	virtual void setMouseCursor(const byte *buf, uint w, uint h, int hotspotX,
+	virtual void setMouseCursor(const void *buf, uint w, uint h, int hotspotX,
 								int hotspotY, uint32 keycolor,
-								int cursorTargetScale,
+								bool dontScale,
 								const Graphics::PixelFormat *format);
 
 	virtual bool pollEvent(Common::Event &event);
-	virtual uint32 getMillis();
+	virtual uint32 getMillis(bool skipRecord = false);
 	virtual void delayMillis(uint msecs);
 
 	virtual MutexRef createMutex();

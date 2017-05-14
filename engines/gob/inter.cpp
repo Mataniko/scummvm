@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -52,6 +52,7 @@ Inter::Inter(GobEngine *vm) : _vm(vm), _varStack(600) {
 	_soundEndTimeKey = 0;
 	_soundStopVal = 0;
 
+	_lastBusyWait = 0;
 	_noBusyWait = false;
 
 	_variables = 0;
@@ -358,6 +359,9 @@ void Inter::allocateVars(uint32 count) {
 }
 
 void Inter::delocateVars() {
+	if (_vm->_game)
+		_vm->_game->deletedVars(_variables);
+
 	delete _variables;
 	_variables = 0;
 }
@@ -450,6 +454,17 @@ uint32 Inter::readValue(uint16 index, uint16 type) {
 	}
 
 	return 0;
+}
+
+void Inter::handleBusyWait() {
+	uint32 now = _vm->_util->getTimeKey();
+
+	if (!_noBusyWait)
+		if ((now - _lastBusyWait) <= 20)
+			_vm->_util->longDelay(1);
+
+	_lastBusyWait = now;
+	_noBusyWait   = false;
 }
 
 } // End of namespace Gob

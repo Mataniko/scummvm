@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -28,10 +28,8 @@
 #include "lastexpress/game/savepoint.h"
 #include "lastexpress/game/state.h"
 
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/lastexpress.h"
-#include "lastexpress/helpers.h"
 
 namespace LastExpress {
 
@@ -41,22 +39,22 @@ Yasmin::Yasmin(LastExpressEngine *engine) : Entity(engine, kEntityYasmin) {
 	ADD_CALLBACK_FUNCTION(Yasmin, playSound);
 	ADD_CALLBACK_FUNCTION(Yasmin, updateFromTime);
 	ADD_CALLBACK_FUNCTION(Yasmin, updateEntity);
-	ADD_CALLBACK_FUNCTION(Yasmin, function6);
-	ADD_CALLBACK_FUNCTION(Yasmin, function7);
+	ADD_CALLBACK_FUNCTION(Yasmin, goEtoG);
+	ADD_CALLBACK_FUNCTION(Yasmin, goGtoE);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter1);
-	ADD_CALLBACK_FUNCTION(Yasmin, chapter1Handler);
+	ADD_CALLBACK_FUNCTION(Yasmin, part1);
 	ADD_CALLBACK_FUNCTION(Yasmin, function10);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter2);
-	ADD_CALLBACK_FUNCTION(Yasmin, chapter2Handler);
+	ADD_CALLBACK_FUNCTION(Yasmin, part2);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter3);
-	ADD_CALLBACK_FUNCTION(Yasmin, chapter3Handler);
+	ADD_CALLBACK_FUNCTION(Yasmin, part3);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter4);
-	ADD_CALLBACK_FUNCTION(Yasmin, chapter4Handler);
+	ADD_CALLBACK_FUNCTION(Yasmin, part4);
 	ADD_CALLBACK_FUNCTION(Yasmin, function17);
 	ADD_CALLBACK_FUNCTION(Yasmin, chapter5);
-	ADD_CALLBACK_FUNCTION(Yasmin, chapter5Handler);
+	ADD_CALLBACK_FUNCTION(Yasmin, part5);
 	ADD_CALLBACK_FUNCTION(Yasmin, function20);
-	ADD_CALLBACK_FUNCTION(Yasmin, function21);
+	ADD_CALLBACK_FUNCTION(Yasmin, hiding);
 	ADD_NULL_FUNCTION();
 }
 
@@ -100,7 +98,7 @@ IMPLEMENT_FUNCTION_II(5, Yasmin, updateEntity, CarIndex, EntityPosition)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(6, Yasmin, function6)
+IMPLEMENT_FUNCTION(6, Yasmin, goEtoG)
 	switch (savepoint.action) {
 	default:
 		break;
@@ -132,7 +130,7 @@ IMPLEMENT_FUNCTION(6, Yasmin, function6)
 			getData()->location = kLocationInsideCompartment;
 			getEntities()->clearSequences(kEntityYasmin);
 
-			CALLBACK_ACTION();
+			callbackAction();
 			break;
 		}
 		break;
@@ -140,7 +138,7 @@ IMPLEMENT_FUNCTION(6, Yasmin, function6)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(7, Yasmin, function7)
+IMPLEMENT_FUNCTION(7, Yasmin, goGtoE)
 	switch (savepoint.action) {
 	default:
 		break;
@@ -172,7 +170,7 @@ IMPLEMENT_FUNCTION(7, Yasmin, function7)
 			getData()->location = kLocationInsideCompartment;
 			getEntities()->clearSequences(kEntityYasmin);
 
-			CALLBACK_ACTION();
+			callbackAction();
 			break;
 		}
 		break;
@@ -186,7 +184,7 @@ IMPLEMENT_FUNCTION(8, Yasmin, chapter1)
 		break;
 
 	case kActionNone:
-		TIME_CHECK(kTimeChapter1, params->param1, setup_chapter1Handler);
+		Entity::timeCheck(kTimeChapter1, params->param1, WRAP_SETUP_FUNCTION(Yasmin, setup_part1));
 		break;
 
 	case kActionDefault:
@@ -198,18 +196,28 @@ IMPLEMENT_FUNCTION(8, Yasmin, chapter1)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(9, Yasmin, chapter1Handler)
+IMPLEMENT_FUNCTION(9, Yasmin, part1)
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
-		TIME_CHECK_CALLBACK(kTime1093500, params->param1, 1, setup_function6);
-		TIME_CHECK_CALLBACK(kTime1161000, params->param2, 3, setup_function7);
-		TIME_CHECK_PLAYSOUND_UPDATEPOSITION(kTime1162800, params->param3, 4, "Har1102", kPosition_4070);
-		TIME_CHECK_CALLBACK_1(kTime1165500, params->param4, 5, setup_playSound, "Har1104");
-		TIME_CHECK_CALLBACK_1(kTime1174500, params->param5, 6, setup_playSound, "Har1106");
-		TIME_CHECK_CALLBACK(kTime1183500, params->param6, 7, setup_function6);
+		if (Entity::timeCheckCallback(kTime1093500, params->param1, 1, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG)))
+			break;
+
+		if (Entity::timeCheckCallback(kTime1161000, params->param2, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+			break;
+
+		if (Entity::timeCheckPlaySoundUpdatePosition(kTime1162800, params->param3, 4, "Har1102", kPosition_4070))
+			break;
+
+		if (Entity::timeCheckCallback(kTime1165500, params->param4, 5, "Har1104", WRAP_SETUP_FUNCTION_S(Yasmin, setup_playSound)))
+			break;
+
+		if (Entity::timeCheckCallback(kTime1174500, params->param5, 6, "Har1106", WRAP_SETUP_FUNCTION_S(Yasmin, setup_playSound)))
+			break;
+
+		Entity::timeCheckCallback(kTime1183500, params->param6, 7, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 		break;
 
 	case kActionCallback:
@@ -224,23 +232,27 @@ IMPLEMENT_FUNCTION(9, Yasmin, chapter1Handler)
 			break;
 
 		case 2:
-			TIME_CHECK_CALLBACK(kTime1161000, params->param2, 3, setup_function7);
+			if (Entity::timeCheckCallback(kTime1161000, params->param2, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+				break;
 			// Fallback to case 3
 
 		case 3:
-			TIME_CHECK_PLAYSOUND_UPDATEPOSITION(kTime1162800, params->param3, 4, "Har1102", kPosition_4070);
+			if (Entity::timeCheckPlaySoundUpdatePosition(kTime1162800, params->param3, 4, "Har1102", kPosition_4070))
+				break;
 			// Fallback to case 4
 
 		case 4:
-			TIME_CHECK_CALLBACK_1(kTime1165500, params->param4, 5, setup_playSound, "Har1104");
+			if (Entity::timeCheckCallback(kTime1165500, params->param4, 5, "Har1104", WRAP_SETUP_FUNCTION_S(Yasmin, setup_playSound)))
+				break;
 			// Fallback to case 5
 
 		case 5:
-			TIME_CHECK_CALLBACK_1(kTime1174500, params->param5, 6, setup_playSound, "Har1106");
+			if (Entity::timeCheckCallback(kTime1174500, params->param5, 6, "Har1106", WRAP_SETUP_FUNCTION_S(Yasmin, setup_playSound)))
+				break;
 			// Fallback to case 6
 
 		case 6:
-			TIME_CHECK_CALLBACK(kTime1183500, params->param6, 7, setup_function6);
+			Entity::timeCheckCallback(kTime1183500, params->param6, 7, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 			break;
 		}
 		break;
@@ -270,18 +282,19 @@ IMPLEMENT_FUNCTION(11, Yasmin, chapter2)
 		getData()->clothes = kClothesDefault;
 		getData()->inventoryItem = kItemNone;
 
-		setup_chapter2Handler();
+		setup_part2();
 	}
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(12, Yasmin, chapter2Handler)
+IMPLEMENT_FUNCTION(12, Yasmin, part2)
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
-		TIME_CHECK_CALLBACK(kTime1759500, params->param1, 1, setup_function7);
+		if (Entity::timeCheckCallback(kTime1759500, params->param1, 1, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+			break;
 
 		if (getState()->time > kTime1800000 && !params->param2) {
 			params->param2 = 1;
@@ -314,7 +327,7 @@ IMPLEMENT_FUNCTION(13, Yasmin, chapter3)
 		break;
 
 	case kActionNone:
-		setup_chapter3Handler();
+		setup_part3();
 		break;
 
 	case kActionDefault:
@@ -328,15 +341,19 @@ IMPLEMENT_FUNCTION(13, Yasmin, chapter3)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(14, Yasmin, chapter3Handler)
+IMPLEMENT_FUNCTION(14, Yasmin, part3)
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
-		TIME_CHECK_CALLBACK(kTime2062800, params->param1, 1, setup_function6);
-		TIME_CHECK_CALLBACK(kTime2106000, params->param2, 2, setup_function7);
-		TIME_CHECK_CALLBACK(kTime2160000, params->param3, 3, setup_function6);
+		if (Entity::timeCheckCallback(kTime2062800, params->param1, 1, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG)))
+			break;
+
+		if (Entity::timeCheckCallback(kTime2106000, params->param2, 2, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+			break;
+
+		Entity::timeCheckCallback(kTime2160000, params->param3, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 		break;
 
 	case kActionCallback:
@@ -345,11 +362,12 @@ IMPLEMENT_FUNCTION(14, Yasmin, chapter3Handler)
 			break;
 
 		case 1:
-			TIME_CHECK_CALLBACK(kTime2106000, params->param2, 2, setup_function7);
+			if (Entity::timeCheckCallback(kTime2106000, params->param2, 2, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+				break;
 			// Fallback to case 2
 
 		case 2:
-			TIME_CHECK_CALLBACK(kTime2160000, params->param3, 3, setup_function6);
+			Entity::timeCheckCallback(kTime2160000, params->param3, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 			break;
 		}
 		break;
@@ -363,7 +381,7 @@ IMPLEMENT_FUNCTION(15, Yasmin, chapter4)
 		break;
 
 	case kActionNone:
-		setup_chapter4Handler();
+		setup_part4();
 		break;
 
 	case kActionDefault:
@@ -375,14 +393,16 @@ IMPLEMENT_FUNCTION(15, Yasmin, chapter4)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(16, Yasmin, chapter4Handler)
+IMPLEMENT_FUNCTION(16, Yasmin, part4)
 	switch (savepoint.action) {
 	default:
 		break;
 
 	case kActionNone:
-		TIME_CHECK_CALLBACK(kTime2457000, params->param1, 1, setup_function7);
-		TIME_CHECK_CALLBACK(kTime2479500, params->param2, 3, setup_function6);
+		if (Entity::timeCheckCallback(kTime2457000, params->param1, 1, WRAP_SETUP_FUNCTION(Yasmin, setup_goGtoE)))
+			break;
+
+		Entity::timeCheckCallback(kTime2479500, params->param2, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 		break;
 
 	case kActionCallback:
@@ -397,7 +417,7 @@ IMPLEMENT_FUNCTION(16, Yasmin, chapter4Handler)
 			break;
 
 		case 2:
-			TIME_CHECK_CALLBACK(kTime2479500, params->param2, 3, setup_function6);
+			Entity::timeCheckCallback(kTime2479500, params->param2, 3, WRAP_SETUP_FUNCTION(Yasmin, setup_goEtoG));
 			break;
 		}
 		break;
@@ -417,7 +437,7 @@ IMPLEMENT_FUNCTION(18, Yasmin, chapter5)
 		break;
 
 	case kActionNone:
-		setup_chapter5Handler();
+		setup_part5();
 		break;
 
 	case kActionDefault:
@@ -433,7 +453,7 @@ IMPLEMENT_FUNCTION(18, Yasmin, chapter5)
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(19, Yasmin, chapter5Handler)
+IMPLEMENT_FUNCTION(19, Yasmin, part5)
 	if (savepoint.action == kActionProceedChapter5)
 		setup_function20();
 IMPLEMENT_FUNCTION_END
@@ -445,8 +465,10 @@ IMPLEMENT_FUNCTION(20, Yasmin, function20)
 		break;
 
 	case kActionNone:
-		UPDATE_PARAM(params->param1, getState()->time, 2700);
-		setup_function21();
+		if (!Entity::updateParameter(params->param1, getState()->time, 2700))
+			break;
+
+		setup_hiding();
 		break;
 
 	case kActionDefault:
@@ -457,14 +479,14 @@ IMPLEMENT_FUNCTION(20, Yasmin, function20)
 
 	case kActionDrawScene:
 		if (getEntities()->isInsideTrainCar(kEntityPlayer, kCarGreenSleeping)) {
-			setup_function21();
+			setup_hiding();
 		}
 		break;
 	}
 IMPLEMENT_FUNCTION_END
 
 //////////////////////////////////////////////////////////////////////////
-IMPLEMENT_FUNCTION(21, Yasmin, function21)
+IMPLEMENT_FUNCTION(21, Yasmin, hiding)
 	switch (savepoint.action) {
 	default:
 		break;
@@ -472,7 +494,7 @@ IMPLEMENT_FUNCTION(21, Yasmin, function21)
 	case kActionNone:
 	case kActionDefault:
 		if (getEntities()->updateEntity(kEntityYasmin, (CarIndex)params->param1, (EntityPosition)params->param2))
-			CALLBACK_ACTION();
+			callbackAction();
 		break;
 
 	case kActionExcuseMeCath:

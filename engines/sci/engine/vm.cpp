@@ -8,25 +8,32 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
 
+#include "common/config-manager.h"
 #include "common/debug.h"
 #include "common/debug-channels.h"
 
 #include "sci/sci.h"
 #include "sci/console.h"
 #include "sci/resource.h"
+#ifdef ENABLE_SCI32
+#include "audio/mixer.h"
+#include "sci/sound/audio32.h"
+#include "sci/sound/music.h"
+#endif
 #include "sci/engine/features.h"
+#include "sci/engine/guest_additions.h"
 #include "sci/engine/state.h"
 #include "sci/engine/kernel.h"
 #include "sci/engine/object.h"
@@ -119,37 +126,35 @@ extern const char *opcodeNames[]; // from scriptdebug.cpp
 
 static reg_t read_var(EngineState *s, int type, int index) {
 	if (validate_variable(s->variables[type], s->stack_base, type, s->variablesMax[type], index)) {
-		if (s->variables[type][index].segment == 0xffff) {
+		if (s->variables[type][index].getSegment() == kUninitializedSegment) {
 			switch (type) {
 			case VAR_TEMP: {
 				// Uninitialized read on a temp
 				//  We need to find correct replacements for each situation manually
-				SciTrackOriginReply originReply;
+				SciCallOrigin originReply;
 				SciWorkaroundSolution solution = trackOriginAndFindWorkaround(index, uninitializedReadWorkarounds, &originReply);
 				if (solution.type == WORKAROUND_NONE) {
 #ifdef RELEASE_BUILD
 					// If we are running an official ScummVM release -> fake 0 in unknown cases
-					warning("Uninitialized read for temp %d from method %s::%s (room %d, script %d, localCall %x)",
-					index, originReply.objectName.c_str(), originReply.methodName.c_str(), s->currentRoomNumber(),
-					originReply.scriptNr, originReply.localCallOffset);
+					warning("Uninitialized read for temp %d from %s", index, originReply.toString().c_str());
 
 					s->variables[type][index] = NULL_REG;
 					break;
 #else
-					error("Uninitialized read for temp %d from method %s::%s (room %d, script %d, localCall %x)",
-					index, originReply.objectName.c_str(), originReply.methodName.c_str(), s->currentRoomNumber(),
-					originReply.scriptNr, originReply.localCallOffset);
+					error("Uninitialized read for temp %d from %s", index, originReply.toString().c_str());
 #endif
 				}
 				assert(solution.type == WORKAROUND_FAKE);
 				s->variables[type][index] = make_reg(0, solution.value);
 				break;
 			}
-			case VAR_PARAM:
+			case VAR_PARAM: {
 				// Out-of-bounds read for a parameter that goes onto stack and hits an uninitialized temp
 				//  We return 0 currently in that case
-				debugC(kDebugLevelVM, "[VM] Read for a parameter goes out-of-bounds, onto the stack and gets uninitialized temp");
+				const SciCallOrigin origin = s->getCurrentCallOrigin();
+				warning("Uninitialized read for parameter %d from %s", index, origin.toString().c_str());
 				return NULL_REG;
+			}
 			default:
 				break;
 			}
@@ -179,7 +184,7 @@ static void write_var(EngineState *s, int type, int index, reg_t value) {
 		// stopGroop object, which points to ego, to the new ego object. If this is not
 		// done, ego's movement will not be updated properly, so the result is
 		// unpredictable (for example in LSL5, Patti spins around instead of walking).
-		if (index == 0 && type == VAR_GLOBAL && getSciVersion() > SCI_VERSION_0_EARLY) {	// global 0 is ego
+		if (index == kGlobalVarEgo && type == VAR_GLOBAL && getSciVersion() > SCI_VERSION_0_EARLY) {
 			reg_t stopGroopPos = s->_segMan->findObjectByName("stopGroop");
 			if (!stopGroopPos.isNull()) {	// does the game have a stopGroop object?
 				// Find the "client" member variable of the stopGroop object, and update it
@@ -195,17 +200,12 @@ static void write_var(EngineState *s, int type, int index, reg_t value) {
 		//  this happens at least in sq1/room 44 (slot-machine), because a send is missing parameters, then
 		//  those parameters are taken from uninitialized stack and afterwards they are copied back into temps
 		//  if we don't remove the segment, we would get false-positive uninitialized reads later
-		if (type == VAR_TEMP && value.segment == 0xffff)
-			value.segment = 0;
+		if (type == VAR_TEMP && value.getSegment() == kUninitializedSegment)
+			value.setSegment(0);
 
 		s->variables[type][index] = value;
 
-		// If the game is trying to change its speech/subtitle settings, apply the ScummVM audio
-		// options first, if they haven't been applied yet
-		if (type == VAR_GLOBAL && index == 90 && !g_sci->getEngineState()->_syncedAudioOptions) {
-			g_sci->syncIngameAudioOptions();
-			g_sci->getEngineState()->_syncedAudioOptions = true;
-		}
+		g_sci->_guestAdditions->writeVarHook(type, index, value);
 	}
 }
 
@@ -225,30 +225,16 @@ ExecStack *execute_method(EngineState *s, uint16 script, uint16 pubfunct, StackP
 		scr = s->_segMan->getScript(seg);
 	}
 
-	int temp = scr->validateExportFunc(pubfunct, false);
-
-	if (getSciVersion() == SCI_VERSION_3)
-		temp += scr->getCodeBlockOffset();
-
-	if (!temp) {
-#ifdef ENABLE_SCI32
-		if (g_sci->getGameId() == GID_TORIN && script == 64036) {
-			// Script 64036 in Torin's Passage is empty and contains an invalid
-			// (empty) export
-		} else if (g_sci->getGameId() == GID_RAMA && script == 64908) {
-			// Script 64908 in the demo of RAMA contains an invalid (empty)
-			// export
-		} else
-#endif
-			error("Request for invalid exported function 0x%x of script %d", pubfunct, script);
-		return NULL;
-	}
-
 	// Check if a breakpoint is set on this method
 	g_sci->checkExportBreakpoint(script, pubfunct);
 
+	uint32 exportAddr = scr->validateExportFunc(pubfunct, false);
+	if (!exportAddr)
+		return NULL;
+
+	assert(argp[0].toUint16() == argc); // The first argument is argc
 	ExecStack xstack(calling_obj, calling_obj, sp, argc, argp,
-						seg, make_reg(seg, temp), -1, pubfunct, -1,
+						seg, make_reg32(seg, exportAddr), -1, -1, -1, pubfunct, -1,
 						s->_executionStack.size() - 1, EXEC_STACK_TYPE_CALL);
 	s->_executionStack.push_back(xstack);
 	return &(s->_executionStack.back());
@@ -265,6 +251,10 @@ static void _exec_varselectors(EngineState *s) {
 			// varselector access?
 			if (xs.argc) { // write?
 				*var = xs.variables_argp[1];
+
+#ifdef ENABLE_SCI32
+				updateInfoFlagViewVisible(s->_segMan->getObject(xs.addr.varp.obj), xs.addr.varp.varindex);
+#endif
 
 			} else // No, read
 				s->r_acc = *var;
@@ -298,25 +288,31 @@ ExecStack *send_selector(EngineState *s, reg_t send_obj, reg_t work_obj, StackPt
 		if (argc > 0x800)	// More arguments than the stack could possibly accomodate for
 			error("send_selector(): More than 0x800 arguments to function call");
 
+#ifdef ENABLE_SCI32
+		g_sci->_guestAdditions->sendSelectorHook(send_obj, selector, argp);
+#endif
+
 		SelectorType selectorType = lookupSelector(s->_segMan, send_obj, selector, &varp, &funcp);
 		if (selectorType == kSelectorNone)
-			error("Send to invalid selector 0x%x of object at %04x:%04x", 0xffff & selector, PRINT_REG(send_obj));
+			error("Send to invalid selector 0x%x (%s) of object at %04x:%04x", 0xffff & selector, g_sci->getKernel()->getSelectorName(0xffff & selector).c_str(), PRINT_REG(send_obj));
 
 		ExecStackType stackType = EXEC_STACK_TYPE_VARSELECTOR;
 		StackPtr curSP = NULL;
-		reg_t curFP = NULL_REG;
+		reg32_t curFP = make_reg32(0, 0);
 		if (selectorType == kSelectorMethod) {
 			stackType = EXEC_STACK_TYPE_CALL;
 			curSP = sp;
-			curFP = funcp;
+			// TODO: Will this offset suffice for large SCI3 scripts?
+			curFP = make_reg32(funcp.getSegment(), funcp.getOffset());
 			sp = CALL_SP_CARRY; // Destroy sp, as it will be carried over
 		}
 
 		if (activeBreakpointTypes || DebugMan.isDebugChannelEnabled(kDebugLevelScripts))
 			debugSelectorCall(send_obj, selector, argc, argp, varp, funcp, s->_segMan, selectorType);
 
+		assert(argp[0].toUint16() == argc); // The first argument is argc
 		ExecStack xstack(work_obj, send_obj, curSP, argc, argp,
-							0xFFFF, curFP, selector, -1, -1,
+							kUninitializedSegment, curFP, selector, -1, -1, -1, -1,
 							origin, stackType);
 
 		if (selectorType == kSelectorVariable)
@@ -333,17 +329,20 @@ ExecStack *send_selector(EngineState *s, reg_t send_obj, reg_t work_obj, StackPt
 		argp += argc + 1;
 	}	// while (framesize > 0)
 
+	// Perform all varselector actions at the top of the stack immediately.
+	// Note that there may be some behind method selector calls as well;
+	// those will get executed by op_ret later.
 	_exec_varselectors(s);
 
 	return s->_executionStack.empty() ? NULL : &(s->_executionStack.back());
 }
 
-static void addKernelCallToExecStack(EngineState *s, int kernelCallNr, int argc, reg_t *argv) {
+static void addKernelCallToExecStack(EngineState *s, int kernelCallNr, int kernelSubCallNr, int argc, reg_t *argv) {
 	// Add stack frame to indicate we're executing a callk.
 	// This is useful in debugger backtraces if this
 	// kernel function calls a script itself.
-	ExecStack xstack(NULL_REG, NULL_REG, NULL, argc, argv - 1, 0xFFFF, NULL_REG,
-						kernelCallNr, -1, -1, s->_executionStack.size() - 1, EXEC_STACK_TYPE_KERNEL);
+	ExecStack xstack(NULL_REG, NULL_REG, argv + argc, argc, argv - 1, kUninitializedSegment, make_reg32(0, 0),
+						-1, kernelCallNr, kernelSubCallNr, -1, -1, s->_executionStack.size() - 1, EXEC_STACK_TYPE_KERNEL);
 	s->_executionStack.push_back(xstack);
 }
 
@@ -362,15 +361,15 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 	if (kernelCall.signature
 			&& !kernel->signatureMatch(kernelCall.signature, argc, argv)) {
 		// signature mismatch, check if a workaround is available
-		SciTrackOriginReply originReply;
+		SciCallOrigin originReply;
 		SciWorkaroundSolution solution = trackOriginAndFindWorkaround(0, kernelCall.workarounds, &originReply);
 		switch (solution.type) {
-		case WORKAROUND_NONE:
-			kernel->signatureDebug(kernelCall.signature, argc, argv);
-			error("[VM] k%s[%x]: signature mismatch via method %s::%s (room %d, script %d, localCall 0x%x)",
-				kernelCall.name, kernelCallNr, originReply.objectName.c_str(), originReply.methodName.c_str(),
-				s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
+		case WORKAROUND_NONE: {
+			Common::String signatureDetailsStr;
+			kernel->signatureDebug(signatureDetailsStr, kernelCall.signature, argc, argv);
+			error("\n%s[VM] k%s[%x]: signature mismatch in %s", signatureDetailsStr.c_str(), kernelCall.name, kernelCallNr, originReply.toString().c_str());
 			break;
+			}
 		case WORKAROUND_IGNORE: // don't do kernel call, leave acc alone
 			return;
 		case WORKAROUND_STILLCALL: // call kernel anyway
@@ -386,7 +385,8 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 
 	// Call kernel function
 	if (!kernelCall.subFunctionCount) {
-		addKernelCallToExecStack(s, kernelCallNr, argc, argv);
+		argv[-1] = make_reg(0, argc); // The first argument is argc
+		addKernelCallToExecStack(s, kernelCallNr, -1, argc, argv);
 		s->r_acc = kernelCall.function(s, argc, argv);
 
 		if (kernelCall.debugLogging)
@@ -402,6 +402,21 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 			error("[VM] k%s[%x]: no subfunction ID parameter given", kernelCall.name, kernelCallNr);
 		if (argv[0].isPointer())
 			error("[VM] k%s[%x]: given subfunction ID is actually a pointer", kernelCall.name, kernelCallNr);
+
+#ifdef ENABLE_SCI32
+		// The Windows version of kShowMovie has subops, but the subop number
+		// is put in the second parameter in SCI2.1+, even though every other
+		// kcall with subops puts the subop in the first parameter. To allow use
+		// of the normal subops system, we swap the arguments so the subop
+		// number is in the usual place.
+		if (getSciVersion() > SCI_VERSION_2 &&
+			g_sci->getPlatform() == Common::kPlatformWindows &&
+			strcmp(kernelCall.name, "ShowMovie") == 0) {
+			assert(argc > 1);
+			SWAP(argv[0], argv[1]);
+		}
+#endif
+
 		const uint16 subId = argv[0].toUint16();
 		// Skip over subfunction-id
 		argc--;
@@ -411,21 +426,22 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 		const KernelSubFunction &kernelSubCall = kernelCall.subFunctions[subId];
 		if (kernelSubCall.signature && !kernel->signatureMatch(kernelSubCall.signature, argc, argv)) {
 			// Signature mismatch
-			SciTrackOriginReply originReply;
+			SciCallOrigin originReply;
 			SciWorkaroundSolution solution = trackOriginAndFindWorkaround(0, kernelSubCall.workarounds, &originReply);
 			switch (solution.type) {
 			case WORKAROUND_NONE: {
-				kernel->signatureDebug(kernelSubCall.signature, argc, argv);
+				Common::String signatureDetailsStr;
+				kernel->signatureDebug(signatureDetailsStr, kernelSubCall.signature, argc, argv);
 				int callNameLen = strlen(kernelCall.name);
 				if (strncmp(kernelCall.name, kernelSubCall.name, callNameLen) == 0) {
 					const char *subCallName = kernelSubCall.name + callNameLen;
-					error("[VM] k%s(%s): signature mismatch via method %s::%s (room %d, script %d, localCall %x)",
-						kernelCall.name, subCallName, originReply.objectName.c_str(), originReply.methodName.c_str(),
-						s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
+					error("\n%s[VM] k%s(%s): signature mismatch in %s",
+						signatureDetailsStr.c_str(), kernelCall.name, subCallName,
+						originReply.toString().c_str());
 				}
-				error("[VM] k%s: signature mismatch via method %s::%s (room %d, script %d, localCall %x)",
-					kernelSubCall.name, originReply.objectName.c_str(), originReply.methodName.c_str(),
-					s->currentRoomNumber(), originReply.scriptNr, originReply.localCallOffset);
+				error("\n%s[VM] k%s: signature mismatch in %s",
+					signatureDetailsStr.c_str(), kernelSubCall.name,
+					originReply.toString().c_str());
 				break;
 			}
 			case WORKAROUND_IGNORE: // don't do kernel call, leave acc alone
@@ -441,7 +457,8 @@ static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 		}
 		if (!kernelSubCall.function)
 			error("[VM] k%s: subfunction ID %d requested, but not available", kernelCall.name, subId);
-		addKernelCallToExecStack(s, kernelCallNr, argc, argv);
+		argv[-1] = make_reg(0, argc); // The first argument is argc
+		addKernelCallToExecStack(s, kernelCallNr, subId, argc, argv);
 		s->r_acc = kernelSubCall.function(s, argc, argv);
 
 		if (kernelSubCall.debugLogging)
@@ -542,6 +559,33 @@ int readPMachineInstruction(const byte *src, byte &extOpcode, int16 opparams[4])
 	return offset;
 }
 
+uint32 findOffset(const int16 relOffset, const Script *scr, const uint32 pcOffset) {
+	uint32 offset;
+
+	switch (g_sci->_features->detectLofsType()) {
+	case SCI_VERSION_0_EARLY:
+		offset = (uint16)pcOffset + relOffset;
+		break;
+	case SCI_VERSION_1_MIDDLE:
+		offset = relOffset;
+		break;
+	case SCI_VERSION_1_1:
+		offset = relOffset + scr->getScriptSize();
+		break;
+#ifdef ENABLE_SCI32
+	case SCI_VERSION_3:
+		// In theory this can break if the variant with a one-byte argument is
+		// used. For now, assume it doesn't happen.
+		offset = scr->relocateOffsetSci3(pcOffset - 2);
+		break;
+#endif
+	default:
+		error("Unknown lofs type");
+	}
+
+	return offset;
+}
+
 void run_vm(EngineState *s) {
 	assert(s);
 
@@ -578,16 +622,16 @@ void run_vm(EngineState *s) {
 		int var_type; // See description below
 		int var_number;
 
-		g_sci->_debugState.old_pc_offset = s->xs->addr.pc.offset;
+		g_sci->_debugState.old_pc_offset = s->xs->addr.pc.getOffset();
 		g_sci->_debugState.old_sp = s->xs->sp;
 
 		if (s->abortScriptProcessing != kAbortNone)
 			return; // Stop processing
 
 		if (s->_executionStackPosChanged) {
-			scr = s->_segMan->getScriptIfLoaded(s->xs->addr.pc.segment);
+			scr = s->_segMan->getScriptIfLoaded(s->xs->addr.pc.getSegment());
 			if (!scr)
-				error("No script in segment %d",  s->xs->addr.pc.segment);
+				error("No script in segment %d",  s->xs->addr.pc.getSegment());
 			s->xs = &(s->_executionStack.back());
 			s->_executionStackPosChanged = false;
 
@@ -609,6 +653,8 @@ void run_vm(EngineState *s) {
 		if (s->abortScriptProcessing != kAbortNone)
 			return; // Stop processing
 
+		g_sci->checkAddressBreakpoint(s->xs->addr.pc);
+
 		// Debug if this has been requested:
 		// TODO: re-implement sci_debug_flags
 		if (g_sci->_debugState.debugging /* sci_debug_flags*/) {
@@ -624,13 +670,13 @@ void run_vm(EngineState *s) {
 
 		s->variablesMax[VAR_TEMP] = s->xs->sp - s->xs->fp;
 
-		if (s->xs->addr.pc.offset >= scr->getBufSize())
+		if (s->xs->addr.pc.getOffset() >= scr->getBufSize())
 			error("run_vm(): program counter gone astray, addr: %d, code buffer size: %d",
-			s->xs->addr.pc.offset, scr->getBufSize());
+			s->xs->addr.pc.getOffset(), scr->getBufSize());
 
 		// Get opcode
 		byte extOpcode;
-		s->xs->addr.pc.offset += readPMachineInstruction(scr->getBuf() + s->xs->addr.pc.offset, extOpcode, opparams);
+		s->xs->addr.pc.incOffset(readPMachineInstruction(scr->getBuf(s->xs->addr.pc.getOffset()), extOpcode, opparams));
 		const byte opcode = extOpcode >> 1;
 		//debug("%s: %d, %d, %d, %d, acc = %04x:%04x, script %d, local script %d", opcodeNames[opcode], opparams[0], opparams[1], opparams[2], opparams[3], PRINT_REG(s->r_acc), scr->getScriptNumber(), local_script->getScriptNumber());
 
@@ -705,7 +751,7 @@ void run_vm(EngineState *s) {
 			break;
 
 		case op_not: // 0x0c (12)
-			s->r_acc = make_reg(0, !(s->r_acc.offset || s->r_acc.segment));
+			s->r_acc = make_reg(0, !(s->r_acc.getOffset() || s->r_acc.getSegment()));
 			// Must allow pointers to be negated, as this is used for checking whether objects exist
 			break;
 
@@ -765,30 +811,30 @@ void run_vm(EngineState *s) {
 
 		case op_bt: // 0x17 (23)
 			// Branch relative if true
-			if (s->r_acc.offset || s->r_acc.segment)
-				s->xs->addr.pc.offset += opparams[0];
+			if (s->r_acc.getOffset() || s->r_acc.getSegment())
+				s->xs->addr.pc.incOffset(opparams[0]);
 
-			if (s->xs->addr.pc.offset >= local_script->getScriptSize())
+			if (s->xs->addr.pc.getOffset() >= local_script->getScriptSize())
 				error("[VM] op_bt: request to jump past the end of script %d (offset %d, script is %d bytes)",
-					local_script->getScriptNumber(), s->xs->addr.pc.offset, local_script->getScriptSize());
+					local_script->getScriptNumber(), s->xs->addr.pc.getOffset(), local_script->getScriptSize());
 			break;
 
 		case op_bnt: // 0x18 (24)
 			// Branch relative if not true
-			if (!(s->r_acc.offset || s->r_acc.segment))
-				s->xs->addr.pc.offset += opparams[0];
+			if (!(s->r_acc.getOffset() || s->r_acc.getSegment()))
+				s->xs->addr.pc.incOffset(opparams[0]);
 
-			if (s->xs->addr.pc.offset >= local_script->getScriptSize())
+			if (s->xs->addr.pc.getOffset() >= local_script->getScriptSize())
 				error("[VM] op_bnt: request to jump past the end of script %d (offset %d, script is %d bytes)",
-					local_script->getScriptNumber(), s->xs->addr.pc.offset, local_script->getScriptSize());
+					local_script->getScriptNumber(), s->xs->addr.pc.getOffset(), local_script->getScriptSize());
 			break;
 
 		case op_jmp: // 0x19 (25)
-			s->xs->addr.pc.offset += opparams[0];
+			s->xs->addr.pc.incOffset(opparams[0]);
 
-			if (s->xs->addr.pc.offset >= local_script->getScriptSize())
+			if (s->xs->addr.pc.getOffset() >= local_script->getScriptSize())
 				error("[VM] op_jmp: request to jump past the end of script %d (offset %d, script is %d bytes)",
-					local_script->getScriptNumber(), s->xs->addr.pc.offset, local_script->getScriptSize());
+					local_script->getScriptNumber(), s->xs->addr.pc.getOffset(), local_script->getScriptSize());
 			break;
 
 		case op_ldi: // 0x1a (26)
@@ -821,7 +867,7 @@ void run_vm(EngineState *s) {
 			// We shouldn't initialize temp variables at all
 			//  We put special segment 0xFFFF in there, so that uninitialized reads can get detected
 			for (int i = 0; i < opparams[0]; i++)
-				s->xs->sp[i] = make_reg(0xffff, 0);
+				s->xs->sp[i] = make_reg(kUninitializedSegment, 0);
 
 			s->xs->sp += opparams[0];
 			break;
@@ -831,14 +877,15 @@ void run_vm(EngineState *s) {
 			int argc = (opparams[1] >> 1) // Given as offset, but we need count
 			           + 1 + s->r_rest;
 			StackPtr call_base = s->xs->sp - argc;
-			s->xs->sp[1].offset += s->r_rest;
 
-			uint16 localCallOffset = s->xs->addr.pc.offset + opparams[0];
+			uint32 localCallOffset = s->xs->addr.pc.getOffset() + opparams[0];
 
+			int final_argc = (call_base->requireUint16()) + s->r_rest;
+			call_base[0] = make_reg(0, final_argc); // The first argument is argc
 			ExecStack xstack(s->xs->objp, s->xs->objp, s->xs->sp,
-							(call_base->requireUint16()) + s->r_rest, call_base,
-							s->xs->local_segment, make_reg(s->xs->addr.pc.segment, localCallOffset),
-							NULL_SELECTOR, -1, localCallOffset, s->_executionStack.size() - 1,
+							final_argc, call_base,
+							s->xs->local_segment, make_reg32(s->xs->addr.pc.getSegment(), localCallOffset),
+							NULL_SELECTOR, -1, -1, -1, localCallOffset, s->_executionStack.size() - 1,
 							EXEC_STACK_TYPE_CALL);
 
 			s->_executionStack.push_back(xstack);
@@ -894,9 +941,9 @@ void run_vm(EngineState *s) {
 			s_temp = s->xs->sp;
 			s->xs->sp -= temp;
 
-			s->xs->sp[0].offset += s->r_rest;
+			s->xs->sp[0].incOffset(s->r_rest);
 			xs_new = execute_method(s, 0, opparams[0], s_temp, s->xs->objp,
-									s->xs->sp[0].offset, s->xs->sp);
+									s->xs->sp[0].getOffset(), s->xs->sp);
 			s->r_rest = 0; // Used up the &rest adjustment
 			if (xs_new)    // in case of error, keep old stack
 				s->_executionStackPosChanged = true;
@@ -908,11 +955,10 @@ void run_vm(EngineState *s) {
 			s_temp = s->xs->sp;
 			s->xs->sp -= temp;
 
-			s->xs->sp[0].offset += s->r_rest;
+			s->xs->sp[0].incOffset(s->r_rest);
 			xs_new = execute_method(s, opparams[0], opparams[1], s_temp, s->xs->objp,
-									s->xs->sp[0].offset, s->xs->sp);
+									s->xs->sp[0].getOffset(), s->xs->sp);
 			s->r_rest = 0; // Used up the &rest adjustment
-
 			if (xs_new)  // in case of error, keep old stack
 				s->_executionStackPosChanged = true;
 			break;
@@ -936,9 +982,13 @@ void run_vm(EngineState *s) {
 				if (old_xs->type == EXEC_STACK_TYPE_VARSELECTOR) {
 					// varselector access?
 					reg_t *var = old_xs->getVarPointer(s->_segMan);
-					if (old_xs->argc) // write?
+					if (old_xs->argc) { // write?
 						*var = old_xs->variables_argp[1];
-					else // No, read
+
+#ifdef ENABLE_SCI32
+						updateInfoFlagViewVisible(s->_segMan->getObject(old_xs->addr.varp.obj), old_xs->addr.varp.varindex);
+#endif
+					} else // No, read
 						s->r_acc = *var;
 				}
 
@@ -965,7 +1015,7 @@ void run_vm(EngineState *s) {
 			s_temp = s->xs->sp;
 			s->xs->sp -= ((opparams[0] >> 1) + s->r_rest); // Adjust stack
 
-			s->xs->sp[1].offset += s->r_rest;
+			s->xs->sp[1].incOffset(s->r_rest);
 			xs_new = send_selector(s, s->r_acc, s->r_acc, s_temp,
 									(int)(opparams[0] >> 1) + (uint16)s->r_rest, s->xs->sp);
 
@@ -976,27 +1026,30 @@ void run_vm(EngineState *s) {
 
 			break;
 
-		case 0x26: // (38)
-		case 0x27: // (39)
-			if (getSciVersion() == SCI_VERSION_3) {
-				if (extOpcode == 0x4c)
-					s->r_acc = obj->getInfoSelector();
-				else if (extOpcode == 0x4d)
-					PUSH32(obj->getInfoSelector());
-				else if (extOpcode == 0x4e)
-					s->r_acc = obj->getSuperClassSelector();	// TODO: is this correct?
-				// TODO: There are also opcodes in
-				// here to get the superclass, and possibly the species too.
-				else
-					error("Dummy opcode 0x%x called", opcode);	// should never happen
-			} else
+		case op_info: // (38)
+			if (getSciVersion() < SCI_VERSION_3)
 				error("Dummy opcode 0x%x called", opcode);	// should never happen
+
+			if (!(extOpcode & 1))
+				s->r_acc = obj->getInfoSelector();
+			else
+				PUSH32(obj->getInfoSelector());
+			break;
+
+		case op_superP: // (39)
+			if (getSciVersion() < SCI_VERSION_3)
+				error("Dummy opcode 0x%x called", opcode);	// should never happen
+
+			if (!(extOpcode & 1))
+				s->r_acc = obj->getSuperClassSelector();
+			else
+				PUSH32(obj->getSuperClassSelector());
 			break;
 
 		case op_class: // 0x28 (40)
 			// Get class address
 			s->r_acc = s->_segMan->getClassAddress((unsigned)opparams[0], SCRIPT_GET_LOCK,
-											s->xs->addr.pc);
+											s->xs->addr.pc.getSegment());
 			break;
 
 		case 0x29: // (41)
@@ -1008,7 +1061,7 @@ void run_vm(EngineState *s) {
 			s_temp = s->xs->sp;
 			s->xs->sp -= ((opparams[0] >> 1) + s->r_rest); // Adjust stack
 
-			s->xs->sp[1].offset += s->r_rest;
+			s->xs->sp[1].incOffset(s->r_rest);
 			xs_new = send_selector(s, s->xs->objp, s->xs->objp,
 									s_temp, (int)(opparams[0] >> 1) + (uint16)s->r_rest,
 									s->xs->sp);
@@ -1021,7 +1074,7 @@ void run_vm(EngineState *s) {
 
 		case op_super: // 0x2b (43)
 			// Send to any class
-			r_temp = s->_segMan->getClassAddress(opparams[0], SCRIPT_GET_LOAD, s->xs->addr.pc);
+			r_temp = s->_segMan->getClassAddress(opparams[0], SCRIPT_GET_LOAD, s->xs->addr.pc.getSegment());
 
 			if (!r_temp.isPointer())
 				error("[VM]: Invalid superclass in object");
@@ -1029,7 +1082,7 @@ void run_vm(EngineState *s) {
 				s_temp = s->xs->sp;
 				s->xs->sp -= ((opparams[1] >> 1) + s->r_rest); // Adjust stack
 
-				s->xs->sp[1].offset += s->r_rest;
+				s->xs->sp[1].incOffset(s->r_rest);
 				xs_new = send_selector(s, r_temp, s->xs->objp, s_temp,
 										(int)(opparams[1] >> 1) + (uint16)s->r_rest,
 										s->xs->sp);
@@ -1044,6 +1097,8 @@ void run_vm(EngineState *s) {
 
 		case op_rest: // 0x2c (44)
 			// Pushes all or part of the parameter variable list on the stack
+			// Index 0 is argc, so normally this will be called as &rest 1 to
+			// forward all the arguments.
 			temp = (uint16) opparams[0]; // First argument
 			s->r_rest = MAX<int16>(s->xs->argc - temp + 1, 0); // +1 because temp counts the paramcount while argc doesn't
 
@@ -1058,14 +1113,14 @@ void run_vm(EngineState *s) {
 			var_number = temp & 0x03; // Get variable type
 
 			// Get variable block offset
-			r_temp.segment = s->variablesSegment[var_number];
-			r_temp.offset = s->variables[var_number] - s->variablesBase[var_number];
+			r_temp.setSegment(s->variablesSegment[var_number]);
+			r_temp.setOffset(s->variables[var_number] - s->variablesBase[var_number]);
 
 			if (temp & 0x08)  // Add accumulator offset if requested
-				r_temp.offset += s->r_acc.requireSint16();
+				r_temp.incOffset(s->r_acc.requireSint16());
 
-			r_temp.offset += opparams[1];  // Add index
-			r_temp.offset *= 2; // variables are 16 bit
+			r_temp.incOffset(opparams[1]);  // Add index
+			r_temp.setOffset(r_temp.getOffset() * 2); // variables are 16 bit
 			// That's the immediate address now
 			s->r_acc = r_temp;
 			break;
@@ -1094,6 +1149,9 @@ void run_vm(EngineState *s) {
 		case op_aTop: // 0x32 (50)
 			// Accumulator To Property
 			validate_property(s, obj, opparams[0]) = s->r_acc;
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0], true);
+#endif
 			break;
 
 		case op_pTos: // 0x33 (51)
@@ -1104,6 +1162,9 @@ void run_vm(EngineState *s) {
 		case op_sTop: // 0x34 (52)
 			// Stack To Property
 			validate_property(s, obj, opparams[0]) = POP32();
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0], true);
+#endif
 			break;
 
 		case op_ipToa: // 0x35 (53)
@@ -1118,7 +1179,9 @@ void run_vm(EngineState *s) {
 				opProperty += 1;
 			else
 				opProperty -= 1;
-
+#ifdef ENABLE_SCI32
+			updateInfoFlagViewVisible(obj, opparams[0], true);
+#endif
 			if (opcode == op_ipToa || opcode == op_dpToa)
 				s->r_acc = opProperty;
 			else
@@ -1127,38 +1190,21 @@ void run_vm(EngineState *s) {
 		}
 
 		case op_lofsa: // 0x39 (57)
-		case op_lofss: // 0x3a (58)
+		case op_lofss: { // 0x3a (58)
 			// Load offset to accumulator or push to stack
-			r_temp.segment = s->xs->addr.pc.segment;
 
-			switch (g_sci->_features->detectLofsType()) {
-			case SCI_VERSION_0_EARLY:
-				r_temp.offset = s->xs->addr.pc.offset + opparams[0];
-				break;
-			case SCI_VERSION_1_MIDDLE:
-				r_temp.offset = opparams[0];
-				break;
-			case SCI_VERSION_1_1:
-				r_temp.offset = opparams[0] + local_script->getScriptSize();
-				break;
-			case SCI_VERSION_3:
-				// In theory this can break if the variant with a one-byte argument is
-				// used. For now, assume it doesn't happen.
-				r_temp.offset = local_script->relocateOffsetSci3(s->xs->addr.pc.offset-2);
-				break;
-			default:
-				error("Unknown lofs type");
-			}
-
-			if (r_temp.offset >= scr->getBufSize())
+			r_temp.setSegment(s->xs->addr.pc.getSegment());
+			r_temp.setOffset(findOffset(opparams[0], local_script, s->xs->addr.pc.getOffset()));
+			if (r_temp.getOffset() >= scr->getBufSize())
 				error("VM: lofsa/lofss operation overflowed: %04x:%04x beyond end"
-				          " of script (at %04x)", PRINT_REG(r_temp), scr->getBufSize());
+						  " of script (at %04x)", PRINT_REG(r_temp), scr->getBufSize());
 
 			if (opcode == op_lofsa)
 				s->r_acc = r_temp;
 			else
 				PUSH32(r_temp);
 			break;
+		}
 
 		case op_push0: // 0x3b (59)
 			PUSH(0);
@@ -1188,6 +1234,7 @@ void run_vm(EngineState *s) {
 
 		case op_line: // 0x3f (63)
 			// Debug opcode (line number)
+			//debug("Script %d, line %d", scr->getScriptNumber(), opparams[0]);
 			break;
 
 		case op_lag: // 0x40 (64)

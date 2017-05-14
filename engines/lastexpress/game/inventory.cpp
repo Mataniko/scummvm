@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,25 +26,24 @@
 #include "lastexpress/data/scene.h"
 #include "lastexpress/data/snd.h"
 
+#include "lastexpress/game/entities.h"
 #include "lastexpress/game/logic.h"
+#include "lastexpress/game/savegame.h"
 #include "lastexpress/game/scenes.h"
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/menu/menu.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/graphics.h"
-#include "lastexpress/helpers.h"
 #include "lastexpress/lastexpress.h"
 #include "lastexpress/resource.h"
-
 
 namespace LastExpress {
 
 Inventory::Inventory(LastExpressEngine *engine) : _engine(engine), _selectedItem(kItemNone), _highlightedItemIndex(0), _itemsShown(0),
-	_showingHourGlass(false), _blinkingEgg(false), _blinkingTime(0), _blinkingInterval(_defaultBlinkingInterval), _blinkingBrightness(1),
+	_showingHourGlass(false), _blinkingDirection(1), _blinkingBrightness(0),
 	_useMagnifier(false), _portraitHighlighted(false), _isOpened(false), _eggHightlighted(false), _itemScene(NULL) {
 
 	//_inventoryRect = Common::Rect(0, 0, 32, 32);
@@ -52,6 +51,8 @@ Inventory::Inventory(LastExpressEngine *engine) : _engine(engine), _selectedItem
 	_selectedItemRect = Common::Rect(44, 0, 76, 32);
 
 	init();
+
+	debug(9, "_showingHourGlass: %d", _showingHourGlass);
 }
 
 Inventory::~Inventory() {
@@ -95,19 +96,19 @@ void Inventory::init() {
 	_entries[kItemPassengerList].isSelectable = true;
 
 	// Auto selection
-	_entries[kItem2].manualSelect = false;
-	_entries[kItem3].manualSelect = false;
-	_entries[kItem5].manualSelect = false;
-	_entries[kItem7].manualSelect = false;
-	_entries[kItem9].manualSelect = false;
-	_entries[kItem11].manualSelect = false;
-	_entries[kItemBeetle].manualSelect = false;
-	_entries[kItem17].manualSelect = false;
-	_entries[kItemFirebird].manualSelect = false;
-	_entries[kItemBriefcase].manualSelect = false;
-	_entries[kItemCorpse].manualSelect = false;
-	_entries[kItemGreenJacket].manualSelect = false;
-	_entries[kItem22].manualSelect = false;
+	_entries[kItem2].floating = false;
+	_entries[kItem3].floating = false;
+	_entries[kItem5].floating = false;
+	_entries[kItem7].floating = false;
+	_entries[kItem9].floating = false;
+	_entries[kItem11].floating = false;
+	_entries[kItemBeetle].floating = false;
+	_entries[kItem17].floating = false;
+	_entries[kItemFirebird].floating = false;
+	_entries[kItemBriefcase].floating = false;
+	_entries[kItemCorpse].floating = false;
+	_entries[kItemGreenJacket].floating = false;
+	_entries[kItem22].floating = false;
 
 	// Scene
 	_entries[kItemMatchBox].scene = kSceneMatchbox;
@@ -121,8 +122,8 @@ void Inventory::init() {
 	_entries[kItemBriefcase].scene = kSceneBriefcase;
 
 	// Has item
-	_entries[kItemTelegram].isPresent = true;
-	_entries[kItemArticle].isPresent = true;
+	_entries[kItemTelegram].inPocket = true;
+	_entries[kItemArticle].inPocket = true;
 
 	_selectedItem = kItemNone;
 }
@@ -162,13 +163,11 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 
 			getMenu()->show(true, kSavegameTypeIndex, 0);
 
-		} else if (ev.type == Common::EVENT_RBUTTONDOWN) {
-			if (getGlobalTimer()) {
-				if (getSoundQueue()->isBuffered("TIMER"))
-					getSoundQueue()->removeFromQueue("TIMER");
+		} else if (ev.type == Common::EVENT_RBUTTONDOWN && getGlobalTimer()) {
+			if (getSoundQueue()->isBuffered("TIMER"))
+				getSoundQueue()->removeFromQueue("TIMER");
 
-				setGlobalTimer(900);
-			}
+			setGlobalTimer(900);
 		}
 	}
 
@@ -180,7 +179,7 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 				if (_highlightedItemIndex)
 					drawHighlight(_highlightedItemIndex, true);
 			} else {
-				// The user released the mouse button, we need to update the inventory state (clear hightlight and items)
+				// The user released the mouse button, we need to update the inventory state (clear highlight and items)
 				drawItem((CursorStyle)getProgress().portrait, 0, 0, 1);
 				_engine->getGraphicsManager()->clear(GraphicsManager::kBackgroundInventory, Common::Rect(0, 44, 32, (int16)(40 * _itemsShown + 40)));
 				_isOpened = false;
@@ -226,12 +225,11 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 
 				if (getFlags()->mouseLeftPressed) {
 					if (getState()->sceneUseBackup) {
-						if (getState()->sceneBackup2
-						 && getFirstExaminableItem() == _selectedItem) {
-							 SceneIndex sceneIndex = getState()->sceneBackup2;
-							 getState()->sceneBackup2 = kSceneNone;
+						if (getState()->sceneBackup2 && getFirstExaminableItem() == _selectedItem) {
+							SceneIndex sceneIndex = getState()->sceneBackup2;
+							getState()->sceneBackup2 = kSceneNone;
 
-							 getScenes()->loadScene(sceneIndex);
+							getScenes()->loadScene(sceneIndex);
 						}
 					} else {
 						getState()->sceneBackup = getState()->scene;
@@ -261,7 +259,7 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 
 		// Change item highlight on list
 		if (getFlags()->mouseLeftPressed) {
-			uint32 index = ev.mouse.y / 40;
+			uint32 index = (uint16)ev.mouse.y / 40;
 
 			if (_highlightedItemIndex && _highlightedItemIndex != index)
 				drawHighlight(_highlightedItemIndex, true);
@@ -299,7 +297,7 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 				getScenes()->loadScene(entry.scene);
 			}
 
-			if (entry.field_2)
+			if (entry.usable)
 				selectItem((InventoryItem)index);
 			else
 				drawSelectedItem();
@@ -347,7 +345,7 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 	if (!getProgress().field_84
 	 && getEntityData(kEntityPlayer)->location != kLocationOutsideTrain
 	 && getProgress().field_18 != 4
-	 && (_selectedItem == kItemNone || get(_selectedItem)->manualSelect || getState()->sceneUseBackup)) {
+	 && (_selectedItem == kItemNone || get(_selectedItem)->floating || getState()->sceneUseBackup)) {
 
 		// Draw inventory contents when clicking on portrait
 		if (ev.type == Common::EVENT_LBUTTONDOWN) {
@@ -364,7 +362,7 @@ void Inventory::handleMouseEvent(const Common::Event &ev) {
 			close();
 
 			// Select item
-			if (_selectedItem == kItemNone || get(_selectedItem)->manualSelect) {
+			if (_selectedItem == kItemNone || get(_selectedItem)->floating) {
 				_selectedItem = getFirstExaminableItem();
 
 				if (_selectedItem != kItemNone)
@@ -418,12 +416,12 @@ void Inventory::show() {
 	drawEgg();
 }
 
-void Inventory::setPortrait(InventoryItem item) {
+void Inventory::setPortrait(InventoryItem item) const {
 	getProgress().portrait = item;
 	drawItem((CursorStyle)getProgress().portrait, 0, 0);
 }
 
-void Inventory::showHourGlass(){
+void Inventory::showHourGlass() const {
 	if (!getMenu()->isShown())
 		drawItem(kCursorHourGlass, 608, 448);
 
@@ -448,11 +446,11 @@ void Inventory::addItem(InventoryItem item) {
 	if (item >= kPortraitOriginal)
 		return;
 
-	get(item)->isPresent = true;
+	get(item)->inPocket = true;
 	get(item)->location = kObjectLocationNone;
 
 	// Auto-select item if necessary
-	if (get(item)->cursor && !get(item)->manualSelect) {
+	if (get(item)->cursor && !get(item)->floating) {
 		_selectedItem = item;
 		drawItem(get(_selectedItem)->cursor, 44, 0);
 		askForRedraw();
@@ -463,7 +461,7 @@ void Inventory::removeItem(InventoryItem item, ObjectLocation newLocation) {
 	if (item >= kPortraitOriginal)
 		return;
 
-	get(item)->isPresent = false;
+	get(item)->inPocket = false;
 	get(item)->location = newLocation;
 
 	if (get(item)->cursor == get(_selectedItem)->cursor) {
@@ -474,7 +472,7 @@ void Inventory::removeItem(InventoryItem item, ObjectLocation newLocation) {
 }
 
 bool Inventory::hasItem(InventoryItem item) {
-	if (get(item)->isPresent && item < kPortraitOriginal)
+	if (get(item)->inPocket && item < kPortraitOriginal)
 		return true;
 
 	return false;
@@ -535,18 +533,18 @@ Common::String Inventory::toString() {
 // Private methods
 //////////////////////////////////////////////////////////////////////////
 InventoryItem Inventory::getFirstExaminableItem() const {
-
 	int index = 0;
-	InventoryEntry entry = _entries[index];
-	while (!entry.isPresent || !entry.cursor || entry.manualSelect) {
+	do {
+		InventoryEntry entry = _entries[index];
+
+		// Check if it is an examinable item
+		if (entry.inPocket && entry.cursor && !entry.floating)
+			return (InventoryItem)index;
+
 		index++;
-		entry = _entries[index];
+	} while (index < kPortraitOriginal);
 
-		if (index >= kPortraitOriginal)
-			return kItemNone;
-	}
-
-	return (InventoryItem)index;
+	return kItemNone;
 }
 
 bool Inventory::isItemSceneParameter(InventoryItem item) const {
@@ -613,7 +611,7 @@ void Inventory::examine(InventoryItem item) {
 	}
 }
 
-void Inventory::drawEgg() {
+void Inventory::drawEgg() const {
 	if (!getMenu()->isShown())
 		drawItem((CursorStyle)(getMenu()->getGameId() + 39), 608, 448, _eggHightlighted ? 0 : 1);
 
@@ -621,40 +619,51 @@ void Inventory::drawEgg() {
 }
 
 // Blinking egg: we need to blink the egg for delta time, with the blinking getting faster until it's always lit.
-void Inventory::drawBlinkingEgg() {
+void Inventory::drawBlinkingEgg(uint ticks) {
+	uint globalTimer = (uint)getGlobalTimer();
+	uint timerValue = (getProgress().jacket == kJacketGreen) ? 450 : 225;
 
-	warning("[Inventory::drawBlinkingEgg] Blinking not implemented");
+	if (globalTimer == timerValue || globalTimer == 900) {
+		_blinkingBrightness = 0;
+		_blinkingDirection = 1;
+	}
 
-	//// TODO show egg (with or without mouseover)
+	globalTimer = globalTimer <= ticks ? 0 : globalTimer - ticks;
+	setGlobalTimer(globalTimer);
 
-	//// Play timer sound
-	//if (getGlobalTimer() < 90) {
-	//	if (getGlobalTimer() + ticks >= 90)
-	//		getSound()->playSoundWithSubtitles("TIMER.SND", 50331664, kEntityPlayer);
+	if (getFlags()->flag_0
+	|| (globalTimer % 5) == 0
+	|| (globalTimer <= 500 && (globalTimer % ((globalTimer + 100) / 100)) == 0))
+		blinkEgg();
 
-	//	if (getSoundQueue()->isBuffered("TIMER"))
-	//		setGlobalTimer(0);
-	//}
+	if (globalTimer < 90) {
+		if ((globalTimer + ticks) >= 90)
+			getSound()->playSoundWithSubtitles("TIMER", (SoundFlag)(kFlagType13|kFlagDefault), kEntityPlayer);
 
-	//// Restore egg to standard brightness
-	//if (!getGlobalTimer()) {
-	//
-	//}
+		if (!getSoundQueue()->isBuffered("TIMER"))
+			setGlobalTimer(0);
+	}
 
+	if (globalTimer == 0) {
+		drawItem((CursorStyle)(getMenu()->getGameId() + 39), 608, 448, _menuEggRect.contains(getCoords()) ? 1 : -1);
 
-	//drawItem(608, 448, getMenu()->getGameId() + 39, _blinkingBrightness)
+		askForRedraw();
 
-	//// TODO if delta time > _blinkingInterval, update egg & ask for redraw then adjust blinking time and remaining time
-	//
-
-	//// Reset values and stop blinking
-	//if (_blinkingTime == 0)
-	//	blinkEgg(false);
-
-	askForRedraw();
+		getSaveLoad()->saveGame(kSavegameTypeAuto, kEntityChapters, 0);
+	}
 }
 
-void Inventory::drawItem(CursorStyle id, uint16 x, uint16 y, int16 brightnessIndex) {
+void Inventory::blinkEgg() {
+	drawItem((CursorStyle)(getMenu()->getGameId() + 39), 608, 448, (_blinkingBrightness == 0) ? -1 : (int16)_blinkingBrightness);
+
+	askForRedraw();
+
+	_blinkingBrightness += _blinkingDirection;
+	if (_blinkingBrightness == 0 || _blinkingBrightness == 3)
+		_blinkingDirection = -_blinkingDirection;
+}
+
+void Inventory::drawItem(CursorStyle id, uint16 x, uint16 y, int16 brightnessIndex) const {
 	Icon icon(id);
 	icon.setPosition(x, y);
 
@@ -666,7 +675,7 @@ void Inventory::drawItem(CursorStyle id, uint16 x, uint16 y, int16 brightnessInd
 
 void Inventory::drawSelectedItem() {
 	// Draw the selected item if any
-	if (!_selectedItem || get(_selectedItem)->manualSelect) {
+	if (!_selectedItem || get(_selectedItem)->floating) {
 		_selectedItem = getFirstExaminableItem();
 
 		if (_selectedItem) {
@@ -678,7 +687,7 @@ void Inventory::drawSelectedItem() {
 	}
 }
 
-void Inventory::clearSelectedItem() {
+void Inventory::clearSelectedItem() const {
 	_engine->getGraphicsManager()->clear(GraphicsManager::kBackgroundInventory, Common::Rect(44, 0, 44 + 32, 32));
 }
 
@@ -693,10 +702,10 @@ void Inventory::open() {
 	// Draw at most 11 items in the inventory
 	_itemsShown = 0;
 	for (int i = 1; i < ARRAYSIZE(_entries); i++) {
-		if (!_entries[i].isPresent)
+		if (!_entries[i].inPocket)
 			continue;
 
-		if (!_entries[i].manualSelect)
+		if (!_entries[i].floating)
 			continue;
 
 		if (_itemsShown < 11) {
@@ -733,14 +742,14 @@ void Inventory::drawHighlight(uint32 currentIndex, bool reset) {
 	}
 }
 
-uint32 Inventory::getItemIndex(uint32 currentIndex) {
+uint32 Inventory::getItemIndex(uint32 currentIndex) const {
 	uint32 count = 0;
 
 	for (uint32 i = 1; i < ARRAYSIZE(_entries); i++) {
-		if (!_entries[i].isPresent)
+		if (!_entries[i].inPocket)
 			continue;
 
-		if (!_entries[i].manualSelect)
+		if (!_entries[i].floating)
 			continue;
 
 		if (count < 11) {

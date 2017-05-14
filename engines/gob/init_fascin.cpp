@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -44,10 +44,10 @@ void Init_Fascination::updateConfig() {
 }
 
 void Init_Fascination::initGame() {
-// HACK - Suppress ADLIB_FLAG as the MDY/TBR player is not working. suppress
-// the PC Speaker too, as the script checks in the intro for it's presence
+// HACK - Suppress
+// the PC Speaker, as the script checks in the intro for it's presence
 // to play or not some noices.
-	_vm->_global->_soundFlags = MIDI_FLAG | BLASTER_FLAG;
+	_vm->_global->_soundFlags = MIDI_FLAG | BLASTER_FLAG | ADLIB_FLAG;
 
 	Init::initGame();
 }

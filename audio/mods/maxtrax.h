@@ -8,23 +8,20 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
 
-// see if all engines using this class are DISABLED
-#if !defined(ENABLE_KYRA)
-
-// normal Header Guard
-#elif !defined(AUDIO_MODS_MAXTRAX_H)
+// Only compiled if Kyra is built-in or we're building for dynamic modules
+#if !defined(AUDIO_MODS_MAXTRAX_H) && (defined(ENABLE_KYRA) || defined(DYNAMIC_MODULES))
 #define AUDIO_MODS_MAXTRAX_H
 
 // #define MAXTRAX_HAS_MODULATION
@@ -217,6 +214,6 @@ private:
 	static void outPutEvent(const Event &ev, int num = -1);
 	static void outPutScore(const Score &sc, int num = -1);
 };
-}	// End of namespace Audio
+} // End of namespace Audio
 
 #endif // !defined(AUDIO_MODS_MAXTRAX_H)

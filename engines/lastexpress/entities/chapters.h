@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -24,7 +24,6 @@
 #define LASTEXPRESS_CHAPTERS_H
 
 #include "lastexpress/entities/entity.h"
-#include "lastexpress/entities/entity_intern.h"
 
 namespace LastExpress {
 
@@ -71,7 +70,7 @@ public:
 	/**
 	 * Handle end of Chapter 1 events
 	 */
-	DECLARE_FUNCTION(chapter1End)
+	DECLARE_FUNCTION(firstDream)
 
 	/**
 	 * Init Chapter 1 data
@@ -154,8 +153,11 @@ public:
 	DECLARE_FUNCTION(chapter5Handler)
 
 private:
+	bool timeCheckEnterStation(TimeValue timeValue, uint &parameter, byte callback, const char *sequence, CityIndex cityIndex);
+	bool timeCheckExitStation(TimeValue timeValue, uint &parameter, byte callback, const char *sequence);
 	void enterExitStation(const SavePoint &savepoint, bool isEnteringStation);
 	void enterExitHelper(bool isEnteringStation);
+	void playSteam() const;
 };
 
 } // End of namespace LastExpress

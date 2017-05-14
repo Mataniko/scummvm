@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -281,7 +281,7 @@ void Inter_v5::o5_getSystemCDSpeed(OpGobParams &params) {
 
 	Font *font;
 	if ((font = _vm->_draw->loadFont("SPEED.LET"))) {
-		_vm->_draw->drawString("100 %", 402, 89, 112, 144, 0, *_vm->_draw->_backSurface, *font);
+		font->drawString("100 %", 402, 89, 112, 144, 0, *_vm->_draw->_backSurface);
 		_vm->_draw->forceBlit();
 
 		delete font;
@@ -293,7 +293,7 @@ void Inter_v5::o5_getSystemRAM(OpGobParams &params) {
 
 	Font *font;
 	if ((font = _vm->_draw->loadFont("SPEED.LET"))) {
-		_vm->_draw->drawString("100 %", 402, 168, 112, 144, 0, *_vm->_draw->_backSurface, *font);
+		font->drawString("100 %", 402, 168, 112, 144, 0, *_vm->_draw->_backSurface);
 		_vm->_draw->forceBlit();
 
 		delete font;
@@ -305,7 +305,7 @@ void Inter_v5::o5_getSystemCPUSpeed(OpGobParams &params) {
 
 	Font *font;
 	if ((font = _vm->_draw->loadFont("SPEED.LET"))) {
-		_vm->_draw->drawString("100 %", 402, 248, 112, 144, 0, *_vm->_draw->_backSurface, *font);
+		font->drawString("100 %", 402, 248, 112, 144, 0, *_vm->_draw->_backSurface);
 		_vm->_draw->forceBlit();
 
 		delete font;
@@ -317,7 +317,7 @@ void Inter_v5::o5_getSystemDrawSpeed(OpGobParams &params) {
 
 	Font *font;
 	if ((font = _vm->_draw->loadFont("SPEED.LET"))) {
-		_vm->_draw->drawString("100 %", 402, 326, 112, 144, 0, *_vm->_draw->_backSurface, *font);
+		font->drawString("100 %", 402, 326, 112, 144, 0, *_vm->_draw->_backSurface);
 		_vm->_draw->forceBlit();
 
 		delete font;
@@ -329,7 +329,7 @@ void Inter_v5::o5_totalSystemSpecs(OpGobParams &params) {
 
 	Font *font;
 	if ((font = _vm->_draw->loadFont("SPEED.LET"))) {
-		_vm->_draw->drawString("100 %", 402, 405, 112, 144, 0, *_vm->_draw->_backSurface, *font);
+		font->drawString("100 %", 402, 405, 112, 144, 0, *_vm->_draw->_backSurface);
 		_vm->_draw->forceBlit();
 
 		delete font;

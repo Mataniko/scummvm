@@ -8,31 +8,27 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
 
-#ifndef DREAMWEB_H
-#define DREAMWEB_H
+#ifndef DREAMWEB_DREAMWEB_H
+#define DREAMWEB_DREAMWEB_H
 
 #include "common/error.h"
-#include "common/file.h"
+#include "common/keyboard.h"
 #include "common/random.h"
 #include "common/rect.h"
-#include "common/savefile.h"
 #include "common/scummsys.h"
 #include "common/system.h"
-
-#include "audio/audiostream.h"
-#include "audio/mixer.h"
 
 #include "engines/engine.h"
 
@@ -43,6 +39,10 @@
 #define SCUMMVM_HEADER MKTAG('S', 'C', 'V', 'M')
 #define SCUMMVM_BLOCK_MAGIC_SIZE 0x1234
 #define SAVEGAME_VERSION 1
+
+namespace Common {
+class File;
+}
 
 namespace DreamWeb {
 
@@ -63,6 +63,7 @@ const unsigned int kMapHeight = 60;
 const unsigned int kLengthOfMap = kMapWidth * kMapHeight;
 const unsigned int kNumExObjects = 114;
 const unsigned int kScreenwidth = 320;
+const unsigned int kScreenheight = 200;
 const unsigned int kDiaryx = (68+24);
 const unsigned int kDiaryy = (48+12);
 const unsigned int kInventx = 80;
@@ -88,10 +89,6 @@ const unsigned int kNumRoomTexts = 38;
 const unsigned int kNumFreeTexts = 82;
 const unsigned int kNumPersonTexts = 1026;
 
-// Keyboard buffer. data.word(kBufferin) and data.word(kBufferout) are indexes
-// into this, making it a ring buffer
-extern uint8 g_keyBuffer[16];
-
 // Engine Debug Flags
 enum {
 	kDebugAnimation = (1 << 0),
@@ -99,16 +96,20 @@ enum {
 };
 
 struct DreamWebGameDescription;
+class DreamWebSound;
 
 class DreamWebEngine : public Engine {
 private:
 	DreamWebConsole			*_console;
+	DreamWebSound *_sound;
 	bool					_vSyncInterrupt;
 
 protected:
 	// Engine APIs
 	virtual Common::Error run();
 	virtual bool hasFeature(EngineFeature f) const;
+
+	GUI::Debugger *getDebugger() { return _console; }
 
 public:
 	DreamWebEngine(OSystem *syst, const DreamWebGameDescription *gameDesc);
@@ -142,48 +143,33 @@ public:
 
 	void quit();
 
-	void loadSounds(uint bank, const Common::String &suffix);
 	bool loadSpeech(const Common::String &filename);
-
-	void enableSavingOrLoading(bool enable = true) { _enableSavingOrLoading = enable; }
 
 	Common::Language getLanguage() const;
 	uint8 modifyChar(uint8 c) const;
+	Common::String modifyFileName(const char *);
 
-	void stopSound(uint8 channel);
-
-	const Common::String& getDatafilePrefix() { return _datafilePrefix; };
+	const Common::String& getDatafilePrefix() { return _datafilePrefix; }
+	const Common::String& getSpeechDirName() { return _speechDirName; }
 
 private:
+	// Keyboard buffer. _bufferIn and _bufferOut are indexes
+	// into this, making it a ring buffer
+	uint8 _keyBuffer[16];
+	uint16 _bufferIn;
+	uint16 _bufferOut;
+
 	void keyPressed(uint16 ascii);
 	void setSpeed(uint speed);
-	void soundHandler();
-	void playSound(uint8 channel, uint8 id, uint8 loops);
 
 	const DreamWebGameDescription	*_gameDescription;
 	Common::RandomSource			_rnd;
 	Common::String _datafilePrefix;
+	Common::String _speechDirName;
 
 	uint _speed;
 	bool _turbo;
 	uint _oldMouseState;
-	bool _enableSavingOrLoading;
-
-	struct Sample {
-		uint offset;
-		uint size;
-		Sample(): offset(), size() {}
-	};
-
-	struct SoundData {
-		Common::Array<Sample> samples;
-		Common::Array<uint8> data;
-	};
-	SoundData _soundData[2];
-	Common::Array<uint8> _speechData;
-
-	Audio::SoundHandle _channelHandle[2];
-	uint8 _channel0, _channel1;
 
 protected:
 	GameVars _vars; // saved variables
@@ -212,7 +198,7 @@ protected:
 
 	// from monitor.cpp
 	char _inputLine[64];
-	char _operand1[14];
+	char _operand1[64];
 	char _currentFile[14];
 
 	// from newplace.cpp
@@ -325,16 +311,6 @@ public:
 
 	// sound related
 	uint8 _roomsSample;
-	uint8 _currentSample;
-	uint8 _channel0Playing;
-	uint8 _channel0Repeat;
-	uint8 _channel1Playing;
-
-	uint8 _volume;
-	uint8 _volumeTo;
-	int8 _volumeDirection;
-	uint8 _volumeCount;
-
 	bool _speechLoaded;
 
 	// misc variables
@@ -342,6 +318,7 @@ public:
 	uint16 _charShift;
 	uint8 _kerning;
 	bool _brightPalette;
+	bool _copyProtection;
 	uint8 _roomLoaded;
 	uint8 _didZoom;
 	uint16 _lineSpacing;
@@ -437,7 +414,7 @@ public:
 	uint8 _saveLoadPage;
 	uint8 _currentSlot;
 	uint8 _cursorPos;
-	uint8 _colourPos;
+	uint8 _colorPos;
 	uint8 _fadeDirection;
 	uint8 _numToFade;
 	uint8 _fadeCount;
@@ -445,9 +422,7 @@ public:
 	uint8 _addToRed;
 	uint8 _addToBlue;
 	uint16 _lastSoundReel;
-	uint8 _lastHardKey;
-	uint16 _bufferIn;
-	uint16 _bufferOut;
+	Common::KeyCode _lastHardKey;
 	uint8 _blinkFrame;
 	uint8 _blinkCount;
 	uint8 _reAssesChanges;
@@ -536,10 +511,11 @@ public:
 	void dirCom();
 	void useMon();
 	bool execCommand();
+	int findCommand(const char *const cmdList[]);
 
 	// from newplace.cpp
-	void getUnderCentre();
-	void putUnderCentre();
+	void getUnderCenter();
+	void putUnderCenter();
 	void showArrows();
 	uint8 getLocation(uint8 index);
 	void setLocation(uint8 index);
@@ -713,15 +689,6 @@ public:
 	void showSaveOps();
 	void showLoadOps();
 
-	// from sound.cpp
-	bool loadSpeech(byte type1, int idx1, byte type2, int idx2);
-	void volumeAdjust();
-	void cancelCh0();
-	void cancelCh1();
-	void loadRoomsSample();
-	void playChannel0(uint8 index, uint8 repeat);
-	void playChannel1(uint8 index);
-
 	// from sprite.cpp
 	void printSprites();
 	void printASprite(const Sprite *sprite);
@@ -785,7 +752,6 @@ public:
 	void showRyanPage();
 	void switchRyanOn();
 	void switchRyanOff();
-	void middlePanel();
 	void showDiary();
 	void readMouse();
 	uint16 readMouseState();
@@ -917,7 +883,6 @@ public:
 	void obsThatDoThings();
 	void describeOb();
 	void putBackObStuff();
-	void reExFromOpen();
 	void showDiaryPage();
 	void showDiaryKeys();
 	void dumpDiaryKeys();
@@ -1030,7 +995,7 @@ public:
 	void useDryer();
 	void callEdensDLift();
 	void callEdensLift();
-	void openYourNeighbour();
+	void openYourNeighbor();
 	void openRyan();
 	void openPoolBoss();
 	void openEden();
@@ -1133,7 +1098,6 @@ public:
 	void frameOutBh(uint8 *dst, const uint8 *src, uint16 pitch, uint16 width, uint16 height, uint16 x, uint16 y);
 	void frameOutFx(uint8 *dst, const uint8 *src, uint16 pitch, uint16 width, uint16 height, uint16 x, uint16 y);
 	void doShake();
-	void vSync();
 	void setMode();
 	void showPCX(const Common::String &suffix);
 	void showFrameInternal(const uint8 *pSrc, uint16 x, uint16 y, uint8 effectsFlag, uint8 width, uint8 height);

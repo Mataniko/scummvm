@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -21,6 +21,7 @@
  */
 
 #include "common/stream.h"
+#include "common/substream.h"
 #include "common/str.h"
 
 #include "gob/gob.h"
@@ -134,8 +135,11 @@ void CMPFile::loadCMP(Common::SeekableReadStream &cmp) {
 	uint32 size = cmp.size();
 	byte  *data = new byte[size];
 
-	if (cmp.read(data, size) != size)
+	if (cmp.read(data, size) != size) {
+		delete[] data;
+
 		return;
+	}
 
 	_vm->_video->drawPackedSprite(data, _surface->getWidth(), _surface->getHeight(), 0, 0, 0, *_surface);
 
@@ -143,7 +147,13 @@ void CMPFile::loadCMP(Common::SeekableReadStream &cmp) {
 }
 
 void CMPFile::loadRXY(Common::SeekableReadStream &rxy) {
-	_coordinates = new RXYFile(rxy);
+	bool bigEndian = (_vm->getEndiannessMethod() == kEndiannessMethodBE) ||
+	                 ((_vm->getEndiannessMethod() == kEndiannessMethodSystem) &&
+	                  (_vm->getEndianness() == kEndiannessBE));
+
+	Common::SeekableSubReadStreamEndian sub(&rxy, 0, rxy.size(), bigEndian, DisposeAfterUse::NO);
+
+	_coordinates = new RXYFile(sub);
 
 	for (uint i = 0; i < _coordinates->size(); i++) {
 		const RXYFile::Coordinates &c = (*_coordinates)[i];
@@ -241,6 +251,11 @@ uint16 CMPFile::addSprite(uint16 left, uint16 top, uint16 right, uint16 bottom) 
 	_maxHeight = MAX(_maxHeight, height);
 
 	return _coordinates->add(left, top, right, bottom);
+}
+
+void CMPFile::recolor(uint8 from, uint8 to) {
+	if (_surface)
+		_surface->recolor(from, to);
 }
 
 } // End of namespace Gob

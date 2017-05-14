@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -23,6 +23,7 @@
 #include "saga/saga.h"
 
 #include "saga/actor.h"
+#include "saga/objectmap.h"
 #include "saga/scene.h"
 
 namespace Saga {
@@ -99,6 +100,47 @@ void Actor::findActorPath(ActorData *actor, const Point &fromPoint, const Point 
 	_debugPointsCount = 0;
 #endif
 
+	// WORKAROUND for bug #3360396. Path finding in IHNM is a bit buggy
+	// compared to the original, which occasionally leads to the player
+	// leaving the room instead of interacting with an object. So far, no
+	// one has figured out how to fix this properly. As a temporary [*]
+	// solution, we try to fix this on a case-by-case basis.
+	//
+	// The workaround is to assume that the player wants to stay in the
+	// room, unless he or she explicitly clicked on an exit zone.
+	//
+	// [*] And there is nothing more permanent than a temporary solution...
+
+	bool pathFindingWorkaround = false;
+
+	if (_vm->getGameId() == GID_IHNM) {
+		int chapter = _vm->_scene->currentChapterNumber();
+		int scene = _vm->_scene->currentSceneNumber();
+
+		// Ellen, in the room with the monitors.
+		if (chapter == 3 && scene == 54)
+			pathFindingWorkaround = true;
+
+		// Nimdok in the recovery room
+		if (chapter == 4 && scene == 71)
+			pathFindingWorkaround = true;
+	}
+
+	int hitZoneIndex;
+	const HitZone *hitZone;
+	bool restrictToRoom = false;
+
+	if (pathFindingWorkaround) {
+		restrictToRoom = true;
+		hitZoneIndex = _vm->_scene->_actionMap->hitTest(toPoint);
+		if (hitZoneIndex != -1) {
+			hitZone = _vm->_scene->_actionMap->getHitZone(hitZoneIndex);
+			if (hitZone->getFlags() & kHitZoneExit) {
+				restrictToRoom = false;
+			}
+		}
+	}
+
 	actor->_walkStepsCount = 0;
 	if (fromPoint == toPoint) {
 		actor->addWalkStepPoint(toPoint);
@@ -110,6 +152,15 @@ void Actor::findActorPath(ActorData *actor, const Point &fromPoint, const Point 
 			if (_vm->_scene->validBGMaskPoint(iteratorPoint)) {
 				maskType = _vm->_scene->getBGMaskType(iteratorPoint);
 				setPathCell(iteratorPoint, _vm->_scene->getDoorState(maskType) ? kPathCellBarrier : kPathCellEmpty);
+				if (restrictToRoom) {
+					hitZoneIndex = _vm->_scene->_actionMap->hitTest(iteratorPoint);
+					if (hitZoneIndex != -1) {
+						hitZone = _vm->_scene->_actionMap->getHitZone(hitZoneIndex);
+						if (hitZone->getFlags() & kHitZoneExit) {
+							setPathCell(iteratorPoint, kPathCellBarrier);
+						}
+					}
+				}
 			} else {
 				setPathCell(iteratorPoint, kPathCellBarrier);
 			}

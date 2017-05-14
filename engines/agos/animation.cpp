@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -57,6 +57,7 @@ MoviePlayer::MoviePlayer(AGOSEngine_Feeble *vm)
 	memset(baseName, 0, sizeof(baseName));
 
 	_ticks = 0;
+	_bgSoundStream = nullptr;
 }
 
 MoviePlayer::~MoviePlayer() {
@@ -251,8 +252,8 @@ bool MoviePlayerDXA::load() {
 	}
 
 	Common::String videoName = Common::String::format("%s.dxa", baseName);
-	Common::SeekableReadStream *videoStream = _vm->_archives.createReadStreamForMember(videoName);
-	if (!videoStream)
+	Common::File *videoStream = new Common::File();
+	if (!videoStream->open(videoName))
 		error("Failed to load video file %s", videoName.c_str());
 	if (!loadStream(videoStream))
 		error("Failed to load video stream from file %s", videoName.c_str());
@@ -260,9 +261,6 @@ bool MoviePlayerDXA::load() {
 	debug(0, "Playing video %s", videoName.c_str());
 
 	CursorMan.showMouse(false);
-
-	_firstFrameOffset = _fileStream->pos();
-
 	return true;
 }
 
@@ -271,7 +269,11 @@ void MoviePlayerDXA::copyFrameToBuffer(byte *dst, uint x, uint y, uint pitch) {
 	uint w = getWidth();
 
 	const Graphics::Surface *surface = decodeNextFrame();
-	byte *src = (byte *)surface->pixels;
+
+	if (!surface)
+		return;
+
+	const byte *src = (const byte *)surface->getPixels();
 	dst += y * pitch + x;
 
 	do {
@@ -281,12 +283,12 @@ void MoviePlayerDXA::copyFrameToBuffer(byte *dst, uint x, uint y, uint pitch) {
 	} while (--h);
 
 	if (hasDirtyPalette())
-		setSystemPalette();
+		g_system->getPaletteManager()->setPalette(getPalette(), 0, 256);
 }
 
 void MoviePlayerDXA::playVideo() {
 	// Most of the videos included in the Amiga version, reduced the
-	// resoluton to 384 x 280, so require the screen to be cleared,
+	// resolution to 384 x 280, so require the screen to be cleared,
 	// before starting playing those videos.
 	if (getWidth() == 384 && getHeight() == 280) {
 		_vm->clearSurfaces();
@@ -302,38 +304,11 @@ void MoviePlayerDXA::stopVideo() {
 }
 
 void MoviePlayerDXA::startSound() {
-	uint32 offset, size;
-
-	if (getSoundTag() == MKTAG('W','A','V','E')) {
-		size = _fileStream->readUint32BE();
-
-		if (_sequenceNum) {
-			Common::File in;
-
-			_fileStream->seek(size, SEEK_CUR);
-
-			in.open("audio.wav");
-			if (!in.isOpen()) {
-				error("Can't read offset file 'audio.wav'");
-			}
-
-			in.seek(_sequenceNum * 8, SEEK_SET);
-			offset = in.readUint32LE();
-			size = in.readUint32LE();
-
-			in.seek(offset, SEEK_SET);
-			_bgSoundStream = Audio::makeWAVStream(in.readStream(size), DisposeAfterUse::YES);
-			in.close();
-		} else {
-			_bgSoundStream = Audio::makeWAVStream(_fileStream->readStream(size), DisposeAfterUse::YES);
-		}
-	} else {
-		_bgSoundStream = Audio::SeekableAudioStream::openStreamFile(baseName);
-	}
+	start();
 
 	if (_bgSoundStream != NULL) {
 		_vm->_mixer->stopHandle(_bgSound);
-		_vm->_mixer->playStream(Audio::Mixer::kSFXSoundType, &_bgSound, _bgSoundStream);
+		_vm->_mixer->playStream(Audio::Mixer::kSFXSoundType, &_bgSound, _bgSoundStream, -1, getVolume(), getBalance());
 	}
 }
 
@@ -344,8 +319,7 @@ void MoviePlayerDXA::nextFrame() {
 	}
 
 	if (_vm->_interactiveVideo == TYPE_LOOPING && endOfVideo()) {
-		_fileStream->seek(_firstFrameOffset);
-		_curFrame = -1;
+		rewind();
 		startSound();
 	}
 
@@ -371,16 +345,18 @@ void MoviePlayerDXA::handleNextFrame() {
 
 bool MoviePlayerDXA::processFrame() {
 	Graphics::Surface *screen = _vm->_system->lockScreen();
-	copyFrameToBuffer((byte *)screen->pixels, (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
+	copyFrameToBuffer((byte *)screen->getPixels(), (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
 	_vm->_system->unlockScreen();
 
-	Common::Rational soundTime(_mixer->getSoundElapsedTime(_bgSound), 1000);
-	if ((_bgSoundStream == NULL) || ((soundTime * getFrameRate()).toInt() / 1000 < getCurFrame() + 1)) {
+	uint32 soundTime = _mixer->getSoundElapsedTime(_bgSound);
+	uint32 nextFrameStartTime = ((Video::VideoDecoder::VideoTrack *)getTrack(0))->getNextFrameStartTime();
+
+	if ((_bgSoundStream == NULL) || soundTime < nextFrameStartTime) {
 
 		if (_bgSoundStream && _mixer->isSoundHandleActive(_bgSound)) {
-			while (_mixer->isSoundHandleActive(_bgSound) && (soundTime * getFrameRate()).toInt() < getCurFrame()) {
+			while (_mixer->isSoundHandleActive(_bgSound) && soundTime < nextFrameStartTime) {
 				_vm->_system->delayMillis(10);
-				soundTime = Common::Rational(_mixer->getSoundElapsedTime(_bgSound), 1000);
+				soundTime = _mixer->getSoundElapsedTime(_bgSound);
 			}
 			// In case the background sound ends prematurely, update
 			// _ticks so that we can still fall back on the no-sound
@@ -399,13 +375,44 @@ bool MoviePlayerDXA::processFrame() {
 	return false;
 }
 
+void MoviePlayerDXA::readSoundData(Common::SeekableReadStream *stream) {
+	uint32 tag = stream->readUint32BE();
+
+	if (tag == MKTAG('W','A','V','E')) {
+		uint32 size = stream->readUint32BE();
+
+		if (_sequenceNum) {
+			Common::File in;
+
+			stream->skip(size);
+
+			in.open("audio.wav");
+			if (!in.isOpen()) {
+				error("Can't read offset file 'audio.wav'");
+			}
+
+			in.seek(_sequenceNum * 8, SEEK_SET);
+			uint32 offset = in.readUint32LE();
+			size = in.readUint32LE();
+
+			in.seek(offset, SEEK_SET);
+			_bgSoundStream = Audio::makeWAVStream(in.readStream(size), DisposeAfterUse::YES);
+			in.close();
+		} else {
+			_bgSoundStream = Audio::makeWAVStream(stream->readStream(size), DisposeAfterUse::YES);
+		}
+	} else {
+		_bgSoundStream = Audio::SeekableAudioStream::openStreamFile(baseName);
+	}
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Movie player for Smacker movies
 ///////////////////////////////////////////////////////////////////////////////
 
 
 MoviePlayerSMK::MoviePlayerSMK(AGOSEngine_Feeble *vm, const char *name)
-	: MoviePlayer(vm), SmackerDecoder(vm->_mixer) {
+	: MoviePlayer(vm), SmackerDecoder() {
 	debug(0, "Creating SMK cutscene player");
 
 	memset(baseName, 0, sizeof(baseName));
@@ -415,8 +422,8 @@ MoviePlayerSMK::MoviePlayerSMK(AGOSEngine_Feeble *vm, const char *name)
 bool MoviePlayerSMK::load() {
 	Common::String videoName = Common::String::format("%s.smk", baseName);
 
-	Common::SeekableReadStream *videoStream = _vm->_archives.createReadStreamForMember(videoName);
-	if (!videoStream)
+	Common::File *videoStream = new Common::File();
+	if (!videoStream->open(videoName))
 		error("Failed to load video file %s", videoName.c_str());
 	if (!loadStream(videoStream))
 		error("Failed to load video stream from file %s", videoName.c_str());
@@ -424,8 +431,6 @@ bool MoviePlayerSMK::load() {
 	debug(0, "Playing video %s", videoName.c_str());
 
 	CursorMan.showMouse(false);
-
-	_firstFrameOffset = _fileStream->pos();
 
 	return true;
 }
@@ -435,7 +440,11 @@ void MoviePlayerSMK::copyFrameToBuffer(byte *dst, uint x, uint y, uint pitch) {
 	uint w = getWidth();
 
 	const Graphics::Surface *surface = decodeNextFrame();
-	byte *src = (byte *)surface->pixels;
+
+	if (!surface)
+		return;
+
+	const byte *src = (const byte *)surface->getPixels();
 	dst += y * pitch + x;
 
 	do {
@@ -445,7 +454,7 @@ void MoviePlayerSMK::copyFrameToBuffer(byte *dst, uint x, uint y, uint pitch) {
 	} while (--h);
 
 	if (hasDirtyPalette())
-		setSystemPalette();
+		g_system->getPaletteManager()->setPalette(getPalette(), 0, 256);
 }
 
 void MoviePlayerSMK::playVideo() {
@@ -458,6 +467,7 @@ void MoviePlayerSMK::stopVideo() {
 }
 
 void MoviePlayerSMK::startSound() {
+	start();
 }
 
 void MoviePlayerSMK::handleNextFrame() {
@@ -467,10 +477,8 @@ void MoviePlayerSMK::handleNextFrame() {
 }
 
 void MoviePlayerSMK::nextFrame() {
-	if (_vm->_interactiveVideo == TYPE_LOOPING && endOfVideo()) {
-		_fileStream->seek(_firstFrameOffset);
-		_curFrame = -1;
-	}
+	if (_vm->_interactiveVideo == TYPE_LOOPING && endOfVideo())
+		rewind();
 
 	if (!endOfVideo()) {
 		decodeNextFrame();
@@ -488,12 +496,12 @@ void MoviePlayerSMK::nextFrame() {
 
 bool MoviePlayerSMK::processFrame() {
 	Graphics::Surface *screen = _vm->_system->lockScreen();
-	copyFrameToBuffer((byte *)screen->pixels, (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
+	copyFrameToBuffer((byte *)screen->getPixels(), (_vm->_screenWidth - getWidth()) / 2, (_vm->_screenHeight - getHeight()) / 2, screen->pitch);
 	_vm->_system->unlockScreen();
 
 	uint32 waitTime = getTimeToNextFrame();
 
-	if (!waitTime) {
+	if (!waitTime && !endOfVideoTracks()) {
 		warning("dropped frame %i", getCurFrame());
 		return false;
 	}
@@ -525,25 +533,25 @@ MoviePlayer *makeMoviePlayer(AGOSEngine_Feeble *vm, const char *name) {
 		memcpy(shortName, baseName, 6);
 
 		sprintf(filename, "%s~1.dxa", shortName);
-		if (vm->_archives.hasFile(filename)) {
+		if (Common::File::exists(filename)) {
 			memset(baseName, 0, sizeof(baseName));
 			memcpy(baseName, filename, 8);
 		}
 
 		sprintf(filename, "%s~1.smk", shortName);
-		if (vm->_archives.hasFile(filename)) {
+		if (Common::File::exists(filename)) {
 			memset(baseName, 0, sizeof(baseName));
 			memcpy(baseName, filename, 8);
 		}
 	}
 
 	sprintf(filename, "%s.dxa", baseName);
-	if (vm->_archives.hasFile(filename)) {
+	if (Common::File::exists(filename)) {
 		return new MoviePlayerDXA(vm, baseName);
 	}
 
 	sprintf(filename, "%s.smk", baseName);
-	if (vm->_archives.hasFile(filename)) {
+	if (Common::File::exists(filename)) {
 		return new MoviePlayerSMK(vm, baseName);
 	}
 

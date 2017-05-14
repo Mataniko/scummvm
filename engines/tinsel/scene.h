@@ -8,7 +8,7 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -75,9 +75,9 @@ enum REEL {
 typedef enum { TRANS_DEF, TRANS_CUT, TRANS_FADE } TRANSITS;
 
 // amount to shift scene handles by
-#define	SCNHANDLE_SHIFT ((TinselV2 && !IsDemo) ? 25 : 23)
-#define	OFFSETMASK ((TinselV2 && !IsDemo) ? 0x01ffffffL : 0x007fffffL)
-#define HANDLEMASK ((TinselV2 && !IsDemo) ? 0xFE000000L : 0xFF800000L)
+#define	SCNHANDLE_SHIFT ((TinselV2 && !TinselV2Demo) ? 25 : 23)
+#define	OFFSETMASK ((TinselV2 && !TinselV2Demo) ? 0x01ffffffL : 0x007fffffL)
+#define HANDLEMASK ((TinselV2 && !TinselV2Demo) ? 0xFE000000L : 0xFF800000L)
 
 void DoHailScene(SCNHANDLE scene);
 

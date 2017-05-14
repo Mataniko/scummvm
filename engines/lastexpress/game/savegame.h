@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -40,32 +40,32 @@
 	Game data Format
 	-----------------
 
-	uint32 {4}      - entity
-	uint32 {4}      - current time
-	uint32 {4}      - time delta (how much a tick is in "real" time)
-	uint32 {4}      - time ticks
-	uint32 {4}      - scene Index               max: 2500
-	byte {1}        - use backup scene
-	uint32 {4}      - backup Scene Index 1      max: 2500
-	uint32 {4}      - backup Scene Index 2      max: 2500
-	uint32 {4}      - selected inventory item   max: 32
-	uint32 {4*100*10} - positions (by car)
-	uint32 {4*16}   - compartments
-	uint32 {4*16}   - compartments ??
-	uint32 {4*128}  - game progress
-	byte {512}      - game events
-	byte {7*32}     - inventory
-	byte {5*128}    - objects
-	byte {1262*40}  - entities (characters and train entities)
+	uint32 {4}        - entity
+	uint32 {4}        - current time
+	uint32 {4}        - time delta (how much a tick is in "real" time)
+	uint32 {4}        - time ticks
+	uint32 {4}        - scene Index               max: 2500
+	byte {1}          - use backup scene
+	uint32 {4}        - backup Scene Index 1      max: 2500
+	uint32 {4}        - backup Scene Index 2      max: 2500
+	uint32 {4}        - selected inventory item   max: 32
+	uint32 {4*100*10} - positions by car(BlockedView)
+	uint32 {4*16}     - compartments (BlockedX)
+	uint32 {4*16}     - compartments? (SoftBlockedX)
+	uint32 {4*128}    - game progress
+	byte {512}        - game events
+	byte {7*32}       - inventory
+	byte {5*128}      - objects
+	byte {1262*40}    - entities (characters and train entities)
 
-	uint32 {4}      - sound queue state
-	uint32 {4}      - ??
-	uint32 {4}      - number of sound entries
-	byte {count*68} - sound entries
+	uint32 {4}        - sound queue state
+	uint32 {4}        - ??
+	uint32 {4}        - number of sound entries
+	byte {count*68}   - sound entries
 
-	byte {16*128}   - save point data
-	uint32 {4}      - number of save points (max: 128)
-	byte {count*16} - save points
+	byte {16*128}     - save point data
+	uint32 {4}        - number of save points (max: 128)
+	byte {count*16}   - save points
 
 	... more unknown stuff
 
@@ -80,10 +80,67 @@
 namespace LastExpress {
 
 // Savegame signatures
-#define SAVEGAME_SIGNATURE       0x12001200
-#define SAVEGAME_ENTRY_SIGNATURE 0xE660E660
+#define SAVEGAME_SIGNATURE       0x12001200    // 301994496
+#define SAVEGAME_ENTRY_SIGNATURE 0xE660E660    // 3865110112
+
+#define WRAP_SYNC_FUNCTION(instance, className, method) \
+	new Common::Functor1Mem<Common::Serializer &, void, className>(instance, &className::method)
 
 class LastExpressEngine;
+
+class SavegameStream : public Common::MemoryWriteStreamDynamic, public Common::SeekableReadStream {
+public:
+	SavegameStream() : MemoryWriteStreamDynamic(DisposeAfterUse::YES), _eos(false) {
+		_enableCompression = false;
+		_bufferOffset = -1;
+		_valueCount = 0;
+		_previousValue = 0;
+		_repeatCount = 0;
+		_offset = 0;
+		_status = kStatusReady;
+
+		memset(_buffer, 0, 256);
+	}
+
+	int32 pos() const { return MemoryWriteStreamDynamic::pos(); }
+	int32 size() const { return MemoryWriteStreamDynamic::size(); }
+	bool seek(int32 offset, int whence = SEEK_SET) { return MemoryWriteStreamDynamic::seek(offset, whence); }
+	bool eos() const { return _eos; }
+	uint32 read(void *dataPtr, uint32 dataSize);
+	uint32 write(const void *dataPtr, uint32 dataSize);
+
+	uint32 process();
+
+private:
+	enum CompressedStreamStatus {
+		kStatusReady,
+		kStatusReading,
+		kStatusWriting
+	};
+
+	uint32 readUncompressed(void *dataPtr, uint32 dataSize);
+
+	// Compressed data
+	uint32 writeCompressed(const void *dataPtr, uint32 dataSize);
+	uint32 readCompressed(void *dataPtr, uint32 dataSize);
+
+	void writeBuffer(uint8 value, bool onlyValue = true);
+	uint8 readBuffer();
+
+private:
+	bool _eos;
+
+	// Compression handling
+	bool                   _enableCompression;
+	int16                  _bufferOffset;
+	byte                   _valueCount;
+	byte                   _previousValue;
+	int16                  _repeatCount;
+	uint32                 _offset;
+	CompressedStreamStatus _status;
+
+	byte _buffer[256];
+};
 
 class SaveLoad {
 public:
@@ -96,8 +153,8 @@ public:
 	uint32 init(GameId id, bool resetHeaders);
 
 	// Save & Load
-	void loadGame(GameId id);
-	void loadGame(GameId id, uint32 index);
+	void loadLastGame();
+	void loadGame(uint32 index);
 	void saveGame(SavegameType type, EntityIndex entity, uint32 value);
 
 	void loadVolumeBrightness();
@@ -110,36 +167,12 @@ public:
 	bool isGameFinished(uint32 menuIndex, uint32 savegameIndex);
 
 	// Accessors
- 	uint32       getTime(uint32 index) { return getEntry(index)->time; }
+	uint32       getTime(uint32 index) { return getEntry(index)->time; }
 	ChapterIndex getChapter(uint32 index) { return getEntry(index)->chapter; }
 	uint32       getValue(uint32 index) { return getEntry(index)->value; }
 	uint32       getLastSavegameTicks() const { return _gameTicksLastSavegame; }
 
 private:
-	class SavegameStream : public Common::MemoryWriteStreamDynamic, public Common::SeekableReadStream {
-	public:
-		SavegameStream() : MemoryWriteStreamDynamic(DisposeAfterUse::YES),
-		 _eos(false) {}
-
-		int32 pos() const { return MemoryWriteStreamDynamic::pos(); }
-		int32 size() const { return MemoryWriteStreamDynamic::size(); }
-		bool seek(int32 offset, int whence = SEEK_SET) { return MemoryWriteStreamDynamic::seek(offset, whence); }
-		bool eos() const { return _eos; }
-		uint32 read(void *dataPtr, uint32 dataSize) {
-			if ((int32)dataSize > size() - pos()) {
-				dataSize = size() - pos();
-				_eos = true;
-			}
-			memcpy(dataPtr, getData() + pos(), dataSize);
-
-			seek(dataSize, SEEK_CUR);
-
-			return dataSize;
-		}
-	private:
-		bool _eos;
-	};
-
 	LastExpressEngine *_engine;
 
 	struct SavegameMainHeader : Common::Serializable {
@@ -268,6 +301,9 @@ private:
 	void writeEntry(SavegameType type, EntityIndex entity, uint32 val);
 	void readEntry(SavegameType *type, EntityIndex *entity, uint32 *val, bool keepIndex);
 
+	uint32 writeValue(Common::Serializer &ser, const char *name, Common::Functor1<Common::Serializer &, void> *function, uint size);
+	uint32 readValue(Common::Serializer &ser, const char *name, Common::Functor1<Common::Serializer &, void> *function, uint size = 0);
+
 	SavegameEntryHeader *getEntry(uint32 index);
 
 	// Opening save files
@@ -279,6 +315,10 @@ private:
 	void initStream();
 	void loadStream(GameId id);
 	void flushStream(GameId id);
+
+	// Misc
+	EntityIndex _entity;
+	void syncEntity(Common::Serializer &ser);
 };
 
 } // End of namespace LastExpress

@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,6 +26,7 @@
 
 #include "backends/graphics/graphics.h"
 #include "backends/mutex/mutex.h"
+#include "gui/EventRecorder.h"
 
 #include "audio/mixer.h"
 #include "graphics/pixelformat.h"
@@ -52,7 +53,7 @@ bool ModularBackend::hasFeature(Feature f) {
 }
 
 void ModularBackend::setFeatureState(Feature f, bool enable) {
-	return _graphicsManager->setFeatureState(f, enable);
+	_graphicsManager->setFeatureState(f, enable);
 }
 
 bool ModularBackend::getFeatureState(Feature f) {
@@ -78,6 +79,18 @@ bool ModularBackend::setGraphicsMode(int mode) {
 
 int ModularBackend::getGraphicsMode() const {
 	return _graphicsManager->getGraphicsMode();
+}
+
+const OSystem::GraphicsMode *ModularBackend::getSupportedShaders() const {
+	return _graphicsManager->getSupportedShaders();
+}
+
+bool ModularBackend::setShader(int id) {
+	return _graphicsManager->setShader(id);
+}
+
+int ModularBackend::getShader() const {
+	return _graphicsManager->getShader();
 }
 
 void ModularBackend::resetGraphicsScale() {
@@ -124,7 +137,7 @@ PaletteManager *ModularBackend::getPaletteManager() {
 	return _graphicsManager;
 }
 
-void ModularBackend::copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h) {
+void ModularBackend::copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h) {
 	_graphicsManager->copyRectToScreen(buf, pitch, x, y, w, h);
 }
 
@@ -141,7 +154,15 @@ void ModularBackend::fillScreen(uint32 col) {
 }
 
 void ModularBackend::updateScreen() {
+#ifdef ENABLE_EVENTRECORDER
+	g_eventRec.preDrawOverlayGui();
+#endif
+
 	_graphicsManager->updateScreen();
+
+#ifdef ENABLE_EVENTRECORDER
+	g_eventRec.postDrawOverlayGui();
+#endif
 }
 
 void ModularBackend::setShakePos(int shakeOffset) {
@@ -171,11 +192,11 @@ void ModularBackend::clearOverlay() {
 	_graphicsManager->clearOverlay();
 }
 
-void ModularBackend::grabOverlay(OverlayColor *buf, int pitch) {
+void ModularBackend::grabOverlay(void *buf, int pitch) {
 	_graphicsManager->grabOverlay(buf, pitch);
 }
 
-void ModularBackend::copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h) {
+void ModularBackend::copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h) {
 	_graphicsManager->copyRectToOverlay(buf, pitch, x, y, w, h);
 }
 
@@ -195,8 +216,8 @@ void ModularBackend::warpMouse(int x, int y) {
 	_graphicsManager->warpMouse(x, y);
 }
 
-void ModularBackend::setMouseCursor(const byte *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, int cursorTargetScale, const Graphics::PixelFormat *format) {
-	_graphicsManager->setMouseCursor(buf, w, h, hotspotX, hotspotY, keycolor, cursorTargetScale, format);
+void ModularBackend::setMouseCursor(const void *buf, uint w, uint h, int hotspotX, int hotspotY, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format) {
+	_graphicsManager->setMouseCursor(buf, w, h, hotspotX, hotspotY, keycolor, dontScale, format);
 }
 
 void ModularBackend::setCursorPalette(const byte *colors, uint start, uint num) {
@@ -230,6 +251,10 @@ Audio::Mixer *ModularBackend::getMixer() {
 
 void ModularBackend::displayMessageOnOSD(const char *msg) {
 	_graphicsManager->displayMessageOnOSD(msg);
+}
+
+void ModularBackend::displayActivityIconOnOSD(const Graphics::Surface *icon) {
+	_graphicsManager->displayActivityIconOnOSD(icon);
 }
 
 void ModularBackend::quit() {

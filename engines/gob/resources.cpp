@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -209,6 +209,7 @@ void Resources::unload(bool del) {
 	_totResourceTable = 0;
 	_extResourceTable = 0;
 	_totTextTable = 0;
+	_totResStart = 0;
 	_totData = 0;
 	_totSize = 0;
 	_imData = 0;
@@ -232,6 +233,8 @@ bool Resources::loadTOTResourceTable() {
 	Common::SeekableReadStream *stream = totFile.getStream();
 	if (!stream)
 		return false;
+
+	_totResStart = totProps.scriptEnd;
 
 	if ((totProps.resourcesOffset == 0xFFFFFFFF) ||
 	    (totProps.resourcesOffset == 0))
@@ -271,7 +274,6 @@ bool Resources::loadTOTResourceTable() {
 			item.type = kResourceTOT;
 	}
 
-	_totResStart = totProps.scriptEnd;
 	_totSize = stream->size() - _totResStart;
 
 	if (_totSize <= 0)
@@ -716,7 +718,7 @@ byte *Resources::getIMData(TOTResourceItem &totItem) const {
 	return _imData + offset;
 }
 
-byte *Resources::getEXTData(EXTResourceItem &extItem, uint32 size) const {
+byte *Resources::getEXTData(EXTResourceItem &extItem, uint32 &size) const {
 	Common::SeekableReadStream *stream = _vm->_dataIO->getFile(_extFile);
 	if (!stream)
 		return 0;
@@ -725,6 +727,10 @@ byte *Resources::getEXTData(EXTResourceItem &extItem, uint32 size) const {
 		delete stream;
 		return 0;
 	}
+
+	// If that workaround is active, limit the resource size instead of throwing an error
+	if (_vm->hasResourceSizeWorkaround())
+		size = MIN<int>(size, stream->size() - extItem.offset);
 
 	byte *data = new byte[extItem.packed ? (size + 2) : size];
 	if (stream->read(data, size) != size) {
@@ -737,7 +743,7 @@ byte *Resources::getEXTData(EXTResourceItem &extItem, uint32 size) const {
 	return data;
 }
 
-byte *Resources::getEXData(EXTResourceItem &extItem, uint32 size) const {
+byte *Resources::getEXData(EXTResourceItem &extItem, uint32 &size) const {
 	Common::SeekableReadStream *stream = _vm->_dataIO->getFile(_exFile);
 	if (!stream)
 		return 0;
@@ -746,6 +752,10 @@ byte *Resources::getEXData(EXTResourceItem &extItem, uint32 size) const {
 		delete stream;
 		return 0;
 	}
+
+	// If that workaround is active, limit the resource size instead of throwing an error
+	if (_vm->hasResourceSizeWorkaround())
+		size = MIN<int>(size, stream->size() - extItem.offset);
 
 	byte *data = new byte[extItem.packed ? (size + 2) : size];
 	if (stream->read(data, size) != size) {

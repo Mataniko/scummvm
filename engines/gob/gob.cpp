@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -26,6 +26,7 @@
 #include "base/plugins.h"
 #include "common/config-manager.h"
 #include "audio/mididrv.h"
+#include "audio/mixer.h"
 
 #include "gui/gui-manager.h"
 #include "gui/dialog.h"
@@ -47,6 +48,10 @@
 #include "gob/scenery.h"
 #include "gob/videoplayer.h"
 #include "gob/save/saveload.h"
+
+#include "gob/pregob/pregob.h"
+#include "gob/pregob/onceupon/abracadabra.h"
+#include "gob/pregob/onceupon/babayaga.h"
 
 namespace Gob {
 
@@ -110,12 +115,25 @@ void PauseDialog::handleKeyDown(Common::KeyState state) {
 
 
 GobEngine::GobEngine(OSystem *syst) : Engine(syst), _rnd("gob") {
+	DebugMan.addDebugChannel(kDebugFuncOp, "FuncOpcodes", "Script FuncOpcodes debug level");
+	DebugMan.addDebugChannel(kDebugDrawOp, "DrawOpcodes", "Script DrawOpcodes debug level");
+	DebugMan.addDebugChannel(kDebugGobOp, "GoblinOpcodes", "Script GoblinOpcodes debug level");
+	DebugMan.addDebugChannel(kDebugSound, "Sound", "Sound output debug level");
+	DebugMan.addDebugChannel(kDebugExpression, "Expression", "Expression parser debug level");
+	DebugMan.addDebugChannel(kDebugGameFlow, "Gameflow", "Gameflow debug level");
+	DebugMan.addDebugChannel(kDebugFileIO, "FileIO", "File Input/Output debug level");
+	DebugMan.addDebugChannel(kDebugSaveLoad, "SaveLoad", "Saving/Loading debug level");
+	DebugMan.addDebugChannel(kDebugGraphics, "Graphics", "Graphics debug level");
+	DebugMan.addDebugChannel(kDebugVideo, "Video", "IMD/VMD video debug level");
+	DebugMan.addDebugChannel(kDebugHotspots, "Hotspots", "Hotspots debug level");
+	DebugMan.addDebugChannel(kDebugDemo, "Demo", "Demo script debug level");
+
 	_sound     = 0; _mult     = 0; _game    = 0;
 	_global    = 0; _dataIO   = 0; _goblin  = 0;
 	_vidPlayer = 0; _init     = 0; _inter   = 0;
 	_map       = 0; _palAnim  = 0; _scenery = 0;
 	_draw      = 0; _util     = 0; _video   = 0;
-	_saveLoad  = 0;
+	_saveLoad  = 0; _preGob   = 0;
 
 	_pauseStart = 0;
 
@@ -131,19 +149,6 @@ GobEngine::GobEngine(OSystem *syst) : Engine(syst), _rnd("gob") {
 	_copyProtection = ConfMan.getBool("copy_protection");
 
 	_console = new GobConsole(this);
-
-	DebugMan.addDebugChannel(kDebugFuncOp, "FuncOpcodes", "Script FuncOpcodes debug level");
-	DebugMan.addDebugChannel(kDebugDrawOp, "DrawOpcodes", "Script DrawOpcodes debug level");
-	DebugMan.addDebugChannel(kDebugGobOp, "GoblinOpcodes", "Script GoblinOpcodes debug level");
-	DebugMan.addDebugChannel(kDebugSound, "Sound", "Sound output debug level");
-	DebugMan.addDebugChannel(kDebugExpression, "Expression", "Expression parser debug level");
-	DebugMan.addDebugChannel(kDebugGameFlow, "Gameflow", "Gameflow debug level");
-	DebugMan.addDebugChannel(kDebugFileIO, "FileIO", "File Input/Output debug level");
-	DebugMan.addDebugChannel(kDebugSaveLoad, "SaveLoad", "Saving/Loading debug level");
-	DebugMan.addDebugChannel(kDebugGraphics, "Graphics", "Graphics debug level");
-	DebugMan.addDebugChannel(kDebugVideo, "Video", "IMD/VMD video debug level");
-	DebugMan.addDebugChannel(kDebugHotspots, "Hotspots", "Hotspots debug level");
-	DebugMan.addDebugChannel(kDebugDemo, "Demo", "Demo script debug level");
 }
 
 GobEngine::~GobEngine() {
@@ -178,6 +183,10 @@ void GobEngine::validateVideoMode(int16 videoMode) {
 	if ((videoMode != 0x10) && (videoMode != 0x13) &&
 		  (videoMode != 0x14) && (videoMode != 0x18))
 		error("Video mode 0x%X is not supported", videoMode);
+}
+
+EndiannessMethod GobEngine::getEndiannessMethod() const {
+	return _endiannessMethod;
 }
 
 Endianness GobEngine::getEndianness() const {
@@ -233,6 +242,10 @@ bool GobEngine::isDemo() const {
 	return (isSCNDemo() || isBATDemo());
 }
 
+bool GobEngine::hasResourceSizeWorkaround() const {
+	return _resourceSizeWorkaround;
+}
+
 bool GobEngine::isCurrentTot(const Common::String &tot) const {
 	return _game->_curTotFile.equalsIgnoreCase(tot);
 }
@@ -270,23 +283,21 @@ void GobEngine::setTrueColor(bool trueColor) {
 }
 
 Common::Error GobEngine::run() {
-	if (!initGameParts()) {
-		GUIErrorMessage("GobEngine::init(): Unknown version of game engine");
-		return Common::kUnknownError;
-	}
+	Common::Error err;
 
-	if (!initGraphics()) {
-		GUIErrorMessage("GobEngine::init(): Failed to set up graphics");
-		return Common::kUnknownError;
-	}
+	err = initGameParts();
+	if (err.getCode() != Common::kNoError)
+		return err;
+
+	err = initGraphics();
+	if (err.getCode() != Common::kNoError)
+		return err;
 
 	// On some systems it's not safe to run CD audio games from the CD.
 	if (isCD())
 		checkCD();
 
-	int cd_num = ConfMan.getInt("cdrom");
-	if (cd_num >= 0)
-		_system->getAudioCDManager()->openCD(cd_num);
+	_system->getAudioCDManager()->open();
 
 	_global->_debugFlag = 1;
 	_video->_doRangeClamp = true;
@@ -364,11 +375,12 @@ void GobEngine::pauseEngineIntern(bool pause) {
 
 		_game->_startTimeKey += duration;
 		_draw->_cursorTimeKey += duration;
-		if (_inter->_soundEndTimeKey != 0)
+		if (_inter && (_inter->_soundEndTimeKey != 0))
 			_inter->_soundEndTimeKey += duration;
 	}
 
-	_vidPlayer->pauseAll(pause);
+	if (_vidPlayer)
+		_vidPlayer->pauseAll(pause);
 	_mixer->pauseAll(pause);
 }
 
@@ -376,6 +388,9 @@ void GobEngine::syncSoundSettings() {
 	Engine::syncSoundSettings();
 
 	_init->updateConfig();
+
+	if (_sound)
+		_sound->adlibSyncVolume();
 }
 
 void GobEngine::pauseGame() {
@@ -388,10 +403,13 @@ void GobEngine::pauseGame() {
 	pauseEngineIntern(false);
 }
 
-bool GobEngine::initGameParts() {
+Common::Error GobEngine::initGameParts() {
+	_resourceSizeWorkaround = false;
+
 	// just detect some devices some of which will be always there if the music is not disabled
 	_noMusic = MidiDriver::getMusicType(MidiDriver::detectDevice(MDT_PCSPK | MDT_MIDI | MDT_ADLIB)) == MT_NULL ? true : false;
-	_saveLoad = 0;
+
+	_endiannessMethod = kEndiannessMethodSystem;
 
 	_global    = new Global(this);
 	_util      = new Util(this);
@@ -411,6 +429,23 @@ bool GobEngine::initGameParts() {
 		_map      = new Map_v1(this);
 		_goblin   = new Goblin_v1(this);
 		_scenery  = new Scenery_v1(this);
+
+		// WORKAROUND: The EGA version of Gobliiins claims a few resources are
+		//             larger than they actually are. The original happily reads
+		//             past the resource structure boundary, but we don't.
+		//             To make sure we don't throw an error like we normally do
+		//             (which leads to these resources not loading), we enable
+		//             this workaround that automatically fixes the resources
+		//             sizes.
+		//
+		//             This glitch is visible in levels
+		//             - 03 (ICIGCAA)
+		//             - 09 (ICVGCGT)
+		//             - 16 (TCVQRPM)
+		//             - 20 (NNGWTTO)
+		//             See also ScummVM bug report #7162.
+		if (isEGA())
+			_resourceSizeWorkaround = true;
 		break;
 
 	case kGameTypeGeisha:
@@ -423,6 +458,8 @@ bool GobEngine::initGameParts() {
 		_goblin   = new Goblin_v1(this);
 		_scenery  = new Scenery_v1(this);
 		_saveLoad = new SaveLoad_Geisha(this, _targetName.c_str());
+
+		_endiannessMethod = kEndiannessMethodAltFile;
 		break;
 
 	case kGameTypeFascination:
@@ -439,6 +476,7 @@ bool GobEngine::initGameParts() {
 
 	case kGameTypeWeen:
 	case kGameTypeGob2:
+	case kGameTypeCrousti:
 		_init     = new Init_v2(this);
 		_video    = new Video_v2(this);
 		_inter    = new Inter_v2(this);
@@ -460,6 +498,33 @@ bool GobEngine::initGameParts() {
 		_goblin   = new Goblin_v2(this);
 		_scenery  = new Scenery_v2(this);
 		_saveLoad = new SaveLoad_v2(this, _targetName.c_str());
+		break;
+
+	case kGameTypeLittleRed:
+		_init     = new Init_v2(this);
+		_video    = new Video_v2(this);
+		_inter    = new Inter_LittleRed(this);
+		_mult     = new Mult_v2(this);
+		_draw     = new Draw_v2(this);
+		_map      = new Map_v2(this);
+		_goblin   = new Goblin_v2(this);
+		_scenery  = new Scenery_v2(this);
+
+		// WORKAROUND: Little Red Riding Hood has a small resource size glitch in the
+		//             screen where Little Red needs to find the animals' homes.
+		_resourceSizeWorkaround = true;
+		break;
+
+	case kGameTypeAJWorld:
+		_init     = new Init_v2(this);
+		_video    = new Video_v2(this);
+		_inter    = new Inter_v2(this);
+		_mult     = new Mult_v2(this);
+		_draw     = new Draw_v2(this);
+		_map      = new Map_v2(this);
+		_goblin   = new Goblin_v2(this);
+		_scenery  = new Scenery_v2(this);
+		_saveLoad = new SaveLoad_AJWorld(this, _targetName.c_str());
 		break;
 
 	case kGameTypeGob3:
@@ -572,20 +637,45 @@ bool GobEngine::initGameParts() {
 		_scenery  = new Scenery_v2(this);
 		_saveLoad = new SaveLoad_v2(this, _targetName.c_str());
 		break;
+
+	case kGameTypeAbracadabra:
+		_init     = new Init_v2(this);
+		_video    = new Video_v2(this);
+		_mult     = new Mult_v2(this);
+		_draw     = new Draw_v2(this);
+		_map      = new Map_v2(this);
+		_goblin   = new Goblin_v2(this);
+		_scenery  = new Scenery_v2(this);
+		_preGob   = new OnceUpon::Abracadabra(this);
+		break;
+
+	case kGameTypeBabaYaga:
+		_init     = new Init_v2(this);
+		_video    = new Video_v2(this);
+		_mult     = new Mult_v2(this);
+		_draw     = new Draw_v2(this);
+		_map      = new Map_v2(this);
+		_goblin   = new Goblin_v2(this);
+		_scenery  = new Scenery_v2(this);
+		_preGob   = new OnceUpon::BabaYaga(this);
+		break;
+
 	default:
 		deinitGameParts();
-		return false;
+		return Common::kUnsupportedGameidError;
 	}
 
 	// Setup mixer
 	syncSoundSettings();
 
-	_inter->setupOpcodes();
+	if (_inter)
+		_inter->setupOpcodes();
 
-	return true;
+	return Common::kNoError;
 }
 
 void GobEngine::deinitGameParts() {
+	delete _preGob;    _preGob = 0;
 	delete _saveLoad;  _saveLoad = 0;
 	delete _mult;      _mult = 0;
 	delete _vidPlayer; _vidPlayer = 0;
@@ -604,10 +694,10 @@ void GobEngine::deinitGameParts() {
 	delete _dataIO;    _dataIO = 0;
 }
 
-bool GobEngine::initGraphics() {
+Common::Error GobEngine::initGraphics() {
 	if        (is800x600()) {
 		warning("GobEngine::initGraphics(): 800x600 games currently unsupported");
-		return false;
+		return Common::kUnsupportedGameidError;
 	} else if (is640x480()) {
 		_width  = 640;
 		_height = 480;
@@ -631,7 +721,7 @@ bool GobEngine::initGraphics() {
 
 	_global->_primarySurfDesc = SurfacePtr(new Surface(_width, _height, _pixelFormat.bytesPerPixel));
 
-	return true;
+	return Common::kNoError;
 }
 
 } // End of namespace Gob

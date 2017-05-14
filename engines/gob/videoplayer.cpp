@@ -8,18 +8,20 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  */
 
+
+#include "video/coktel_decoder.h"
 
 #include "gob/videoplayer.h"
 #include "gob/global.h"
@@ -232,6 +234,23 @@ void VideoPlayer::closeLiveSound() {
 void VideoPlayer::closeAll() {
 	for (int i = 0; i < kVideoSlotCount; i++)
 		closeVideo(i);
+}
+
+bool VideoPlayer::reopenVideo(int slot) {
+	Video *video = getVideoBySlot(slot);
+	if (!video)
+		return true;
+
+	return reopenVideo(*video);
+}
+
+bool VideoPlayer::reopenAll() {
+	bool all = true;
+	for (int i = 0; i < kVideoSlotCount; i++)
+		if (!reopenVideo(i))
+			all = false;
+
+	return all;
 }
 
 void VideoPlayer::pauseVideo(int slot, bool pause) {
@@ -717,7 +736,11 @@ bool VideoPlayer::copyFrame(int slot, Surface &dest,
 	if (!surface)
 		return false;
 
-	Surface src(surface->w, surface->h, surface->format.bytesPerPixel, (byte *)surface->pixels);
+	// FIXME? This currently casts away const from the pixel data. However, it
+	// is only used read-only in this case (as far as I can tell). Not casting
+	// the const qualifier away will lead to an additional allocation and copy
+	// of the frame data which is undesirable.
+	Surface src(surface->w, surface->h, surface->format.bytesPerPixel, (byte *)const_cast<void *>(surface->getPixels()));
 
 	dest.blit(src, left, top, left + width - 1, top + height - 1, x, y, transp);
 	return true;
@@ -848,6 +871,39 @@ Common::String VideoPlayer::findFile(const Common::String &file, Properties &pro
 	properties.height = video->getHeight();
 
 	return video;
+}
+
+bool VideoPlayer::reopenVideo(Video &video) {
+	if (video.isEmpty())
+		return true;
+
+	if (video.fileName.empty()) {
+		video.close();
+		return false;
+	}
+
+	Properties properties;
+
+	properties.type = video.properties.type;
+
+	Common::String fileName = findFile(video.fileName, properties);
+	if (fileName.empty()) {
+		video.close();
+		return false;
+	}
+
+	Common::SeekableReadStream *stream = _vm->_dataIO->getFile(fileName);
+	if (!stream) {
+		video.close();
+		return false;
+	}
+
+	if (!video.decoder->reloadStream(stream)) {
+		delete stream;
+		return false;
+	}
+
+	return true;
 }
 
 void VideoPlayer::copyPalette(const Video &video, int16 palStart, int16 palEnd) {

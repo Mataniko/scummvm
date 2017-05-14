@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -32,10 +32,8 @@
 #include "lastexpress/game/state.h"
 
 #include "lastexpress/sound/queue.h"
-#include "lastexpress/sound/sound.h"
 
 #include "lastexpress/lastexpress.h"
-#include "lastexpress/helpers.h"
 
 namespace LastExpress {
 
@@ -269,18 +267,20 @@ IMPLEMENT_FUNCTION(8, Train, process)
 		if ((getEntities()->isPlayerInCar(kCarGreenSleeping) || getEntities()->isPlayerInCar(kCarRedSleeping))
 		  && params->param4 && !params->param5) {
 
-		  params->param4 -= 1;
+			params->param4 -= 1;
 
-		  if (!params->param4 && getProgress().jacket == kJacketGreen) {
+			if (!params->param4 && getProgress().jacket == kJacketGreen) {
 
-			  getAction()->playAnimation(isNight() ? kEventCathSmokeNight : kEventCathSmokeDay);
-			  params->param5 = 1;
-			  getScenes()->processScene();
-		  }
+				getAction()->playAnimation(isNight() ? kEventCathSmokeNight : kEventCathSmokeDay);
+				params->param5 = 1;
+				getScenes()->processScene();
+			}
 		}
 
 		if (params->param6) {
-			UPDATE_PARAM_GOTO(params1->param7, getState()->time, 900, label_process);
+			if (!Entity::updateParameter(params1->param7, getState()->time, 900))
+				goto label_process;
+
 			getScenes()->loadSceneFromPosition(kCarRestaurant, 58);
 		}
 
@@ -552,7 +552,7 @@ void Train::handleCompartmentAction() {
 
 	ENTITY_PARAM(0, 8) = params->param1;
 
-	CALLBACK_ACTION();
+	callbackAction();
 }
 
 //////////////////////////////////////////////////////////////////////////

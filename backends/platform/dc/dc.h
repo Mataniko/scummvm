@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -43,7 +43,9 @@ class Interactive
  public:
   virtual int key(int k, byte &shiftFlags) = 0;
   virtual void mouse(int x, int y) = 0;
+  virtual ~Interactive() = 0;
 };
+inline Interactive::~Interactive() { }
 
 #include "softkbd.h"
 
@@ -55,21 +57,16 @@ class DCHardware {
 };
 
 class DCCDManager : public DefaultAudioCDManager {
-  // Initialize the specified CD drive for audio playback.
-  bool openCD(int drive);
+public:
+	// Poll cdrom status
+	// Returns true if cd audio is playing
+	bool isPlaying() const;
 
-  // Poll cdrom status
-  // Returns true if cd audio is playing
-  bool pollCD();
+	// Play cdrom audio track
+	bool play(int track, int numLoops, int startFrame, int duration, bool onlyEmulate = false);
 
-  // Play cdrom audio track
-  void playCD(int track, int num_loops, int start_frame, int duration);
-
-  // Stop cdrom audio track
-  void stopCD();
-
-  // Update cdrom audio status
-  void updateCD();
+	// Stop cdrom audio track
+	void stop();
 };
 
 class OSystem_Dreamcast : private DCHardware, public EventsBaseBackend, public PaletteManager, public FilesystemFactory
@@ -127,7 +124,7 @@ public:
 
   // Draw a bitmap to screen.
   // The screen will not be updated to reflect the new bitmap
-  void copyRectToScreen(const byte *buf, int pitch, int x, int y, int w, int h);
+  void copyRectToScreen(const void *buf, int pitch, int x, int y, int w, int h);
 
 	virtual Graphics::Surface *lockScreen();
 	virtual void unlockScreen();
@@ -142,7 +139,7 @@ public:
   void warpMouse(int x, int y);
 
   // Set the bitmap that's used when drawing the cursor.
-  void setMouseCursor(const byte *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, int cursorTargetScale, const Graphics::PixelFormat *format);
+  void setMouseCursor(const void *buf, uint w, uint h, int hotspot_x, int hotspot_y, uint32 keycolor, bool dontScale, const Graphics::PixelFormat *format);
 
   // Replace the specified range of cursor the palette with new colors.
   void setCursorPalette(const byte *colors, uint start, uint num);
@@ -151,7 +148,7 @@ public:
   void setShakePos(int shake_pos);
 
   // Get the number of milliseconds since the program was started.
-  uint32 getMillis();
+  uint32 getMillis(bool skipRecord = false);
 
   // Delay for a specified amount of milliseconds
   void delayMillis(uint msecs);
@@ -172,8 +169,8 @@ public:
   void showOverlay();
   void hideOverlay();
   void clearOverlay();
-  void grabOverlay(OverlayColor *buf, int pitch);
-  void copyRectToOverlay(const OverlayColor *buf, int pitch, int x, int y, int w, int h);
+  void grabOverlay(void *buf, int pitch);
+  void copyRectToOverlay(const void *buf, int pitch, int x, int y, int w, int h);
   virtual Graphics::PixelFormat getOverlayFormat() const { return Graphics::createPixelFormat<4444>(); }
 
   // Mutex handling
