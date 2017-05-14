@@ -59,6 +59,15 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 		GUIO1(GUIO_NONE)
 	},
 
+	// Heart of China English PC
+	{"china", "",
+		AD_ENTRY1s("volume.rmf", "15a0bbe5aa5fd777494a2ef1c6fee378", 10008),
+		Common::EN_ANY,
+		Common::kPlatformDOS,
+		ADGF_NO_FLAGS,
+		GUIO1(GUIO_NONE)
+	},
+
 	// Heart of China - English PC v1.216
 	{"china", "",
 		AD_ENTRY1s("volume.rmf", "2da720143c1e857490daded15682df87", 9791),
