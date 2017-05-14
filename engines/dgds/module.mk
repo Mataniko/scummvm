@@ -1,6 +1,6 @@
 MODULE := engines/dgds
 
-MODULE_OBJS = \
+MODULE_OBJS := \
 	compression.o \
 	detection.o \
 	dgds.o \
