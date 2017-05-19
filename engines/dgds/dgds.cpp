@@ -57,14 +57,10 @@ DgdsEngine::~DgdsEngine() {
 	delete _rnd;
 }
 
-Common::Error DgdsEngine::init() {
+Common::Error DgdsEngine::run() {
 	// Initialize backend
 	initGraphics(320, 200, true);
 
-	return Common::kNoError;
-}
-
-Common::Error DgdsEngine::run() {
 	Common::String gameName = Resman.findGDS();
 	if(!gameName.size())
 		return Common::kNoGameDataFoundError;
