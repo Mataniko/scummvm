@@ -131,10 +131,9 @@ void Resource::dump(Common::String const &outFilename, bool dumpSubres) {
 			Resource *subres = getSubResource(_subResources[i]);
 			// append the iterator value to the filename to handle
 			// subresource collections (so filenames aren't overwritten)		
-			char* subNum = new char[4];
-			itoa(i, subNum, 10);
-			subres->dump(outFilename + "." + _subResources[i].tag + subNum, dumpSubres);
-			delete subNum;
+			char subNum[4];			
+			sprintf(subNum, "%d", i);
+			subres->dump(outFilename + "." + _subResources[i].tag + subNum, dumpSubres);			
 			delete subres;
 		}
 	} else {
