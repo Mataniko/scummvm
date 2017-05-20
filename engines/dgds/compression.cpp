@@ -31,8 +31,9 @@
 namespace Dgds {
 
 Common::MemoryReadStream* decompLZW(Common::SeekableReadStream *in, int size) {
-	byte *data = new byte[size];
-	LZW l(in, data);
+	//TODO: Our decompression algorithm creates an extra byte. There's a bug in here or the resource size is incorrect.
+	byte *data = new byte[size+1];
+	LZW l(in, data);	
 	Common::MemoryReadStream *stream = new Common::MemoryReadStream(data, size, DisposeAfterUse::YES);
 	return stream;
 }
