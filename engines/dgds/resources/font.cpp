@@ -37,7 +37,7 @@ Font::Font(Resource *res) :
 		loadFNT(fnt);
 		delete fnt;
 	} else {
-		error ("No FNT Tag detected");
+		error("No FNT Tag detected");
 	}
 }
 
@@ -75,8 +75,8 @@ void Font::loadFNT(Resource *resFNT) {
 
 		byte comprMethod = resFNT->readByte();
 		int32 size2 = resFNT->readUint32LE();
-		assert (comprMethod == 2);
-		assert (size == size2);
+		assert(comprMethod == 2);
+		assert(size == size2);
 
 		Common::SeekableReadStream *decomp = decompLZW(resFNT, size2);
 
@@ -85,7 +85,7 @@ void Font::loadFNT(Resource *resFNT) {
 		for (int i = 0; i < _numChars; i++) {
 			_offsets[i] = decomp->readUint16LE();
 			//if (_offsets[i] != i * 8)
-				//warning("WARNING: got %d expected %d", size, i * 8);
+			//warning("WARNING: got %d expected %d", size, i * 8);
 		}
 
 		// Get the width of the characters
@@ -155,7 +155,7 @@ bool Font::drawChar(Graphics::Surface *surf, int screenx, int screeny, char c, i
 	if (!hasChar(c))
 		return false;
 
-	byte* area = (byte*)surf->getBasePtr(screenx, screeny);
+	byte *area = (byte *)surf->getBasePtr(screenx, screeny);
 	uint16 offset = getCharOffset(c);
 
 	for (int y = 0; y < _sizey; y++, offset++) {

@@ -28,7 +28,7 @@
 #include "common/fs.h"
 
 namespace Common {
-	DECLARE_SINGLETON(Dgds::ResourceManager);
+DECLARE_SINGLETON(Dgds::ResourceManager);
 }
 
 namespace Dgds {
@@ -94,7 +94,7 @@ ResourceManager::ResourceManager() {
 			// Get the size of the resource
 			resourceFileInfo.size = volumeFile.readUint32LE();
 
-			if (resourceFileInfo.size == (uint32)-1)
+			if (resourceFileInfo.size == (uint32) - 1)
 				resourceFileInfo.size = 0;
 
 			// Adjust the beginning of the contents to skip the previous read information
@@ -102,8 +102,8 @@ ResourceManager::ResourceManager() {
 
 			/*
 			debug("%s/%s: hash(%x) offset(%x) size(%x)",
-				resourceFileInfo.fileName.c_str(), filename.c_str(),
-				resourceFileInfo.hash, resourceFileInfo.offset, resourceFileInfo.size);
+			    resourceFileInfo.fileName.c_str(), filename.c_str(),
+			    resourceFileInfo.hash, resourceFileInfo.offset, resourceFileInfo.size);
 			*/
 
 			// See if there's a tag
@@ -133,7 +133,7 @@ Resource *ResourceManager::load(Common::String const &resourceName) {
 
 	if (Common::File::exists(resourceName)) {
 		// Open the resource file
-		Common::File* file = new Common::File();
+		Common::File *file = new Common::File();
 		file->open(resourceName);
 
 		// See if there's a tag
@@ -162,8 +162,8 @@ Resource *ResourceManager::getResource(Common::String const &resourceName, Resou
 
 	// Return the substream corresponding to the resource
 	return new Resource(resourceName,
-		new Common::SeekableSubReadStream(&_currentOpenFile, resourceFileInfo.offset,
-		resourceFileInfo.offset + resourceFileInfo.size), resourceFileInfo.hasSubres);
+	                    new Common::SeekableSubReadStream(&_currentOpenFile, resourceFileInfo.offset,
+	                            resourceFileInfo.offset + resourceFileInfo.size), resourceFileInfo.hasSubres);
 }
 
 Common::String ResourceManager::findGDS(void) {

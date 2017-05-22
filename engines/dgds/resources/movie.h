@@ -59,7 +59,7 @@ enum {
 	// kChunk2310 = 0x2310,
 	// kChunk2320 = 0x2320,
 	// kChunk2400 = 0x2400,
-	kChunkSetWindow_1 =0x4000,
+	kChunkSetWindow_1 = 0x4000,
 	kChunkFadeOut = 0x4110,
 	kChunkFadeIn = 0x4120,
 	kChunkSaveImage_1 = 0x4200,

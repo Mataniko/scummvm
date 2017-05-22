@@ -33,7 +33,7 @@ Resource::Resource(Common::String name, Common::SeekableReadStream *stream, bool
 	_name(name),
 	_stream(stream) {
 
-	assert (stream);
+	assert(stream);
 
 	if (hasSubres) {
 		// Find the tags
@@ -118,8 +118,8 @@ Resource *Resource::getSubResource(Common::String const &tag) {
 Resource *Resource::getSubResource(ResourceInfo const &subResourceInfo) {
 	// Return the substream corresponding to the subresource
 	Common::SeekableSubReadStream *stream = new Common::SeekableSubReadStream(_stream,
-			subResourceInfo.offset,
-			subResourceInfo.offset + subResourceInfo.size);
+	        subResourceInfo.offset,
+	        subResourceInfo.offset + subResourceInfo.size);
 	Resource *sub = new Resource(_name + "." + subResourceInfo.tag, stream, subResourceInfo.hasSubres);
 
 	return sub;
@@ -130,10 +130,10 @@ void Resource::dump(Common::String const &outFilename, bool dumpSubres) {
 		for (uint32 i = 0; i < _subResources.size(); i++) {
 			Resource *subres = getSubResource(_subResources[i]);
 			// append the iterator value to the filename to handle
-			// subresource collections (so filenames aren't overwritten)		
-			char subNum[4];			
+			// subresource collections (so filenames aren't overwritten)
+			char subNum[4];
 			sprintf(subNum, "%d", i);
-			subres->dump(outFilename + "." + _subResources[i].tag + subNum, dumpSubres);			
+			subres->dump(outFilename + "." + _subResources[i].tag + subNum, dumpSubres);
 			delete subres;
 		}
 	} else {
@@ -145,7 +145,7 @@ void Resource::dump(Common::String const &outFilename, bool dumpSubres) {
 		Common::DumpFile outFile;
 		outFile.open(outFilename);
 
-		char* fileContents = new char[1024];
+		char *fileContents = new char[1024];
 		int len;
 		for (int i = _stream->size(); i > 0; i -= len) {
 			len = _stream->read(fileContents, 1024 < i ? 1024 : i);

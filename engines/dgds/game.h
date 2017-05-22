@@ -37,8 +37,12 @@ public:
 	Game(DgdsEngine *engine);
 	virtual ~Game();
 
-	int32 getGameID() { return _gameID; }
-	Common::String getVersion() { return _version; }
+	int32 getGameID() {
+		return _gameID;
+	}
+	Common::String getVersion() {
+		return _version;
+	}
 
 protected:
 	bool init();

@@ -30,15 +30,15 @@
 
 namespace Dgds {
 
-Common::MemoryReadStream* decompLZW(Common::SeekableReadStream *in, int size) {
+Common::MemoryReadStream *decompLZW(Common::SeekableReadStream *in, int size) {
 	//TODO: Our decompression algorithm creates an extra byte. There's a bug in here or the resource size is incorrect.
-	byte *data = new byte[size+1];
-	LZW l(in, data);	
+	byte *data = new byte[size + 1];
+	LZW l(in, data);
 	Common::MemoryReadStream *stream = new Common::MemoryReadStream(data, size, DisposeAfterUse::YES);
 	return stream;
 }
 
-Common::MemoryReadStream* decompRLE(Common::SeekableReadStream *in, int size) {
+Common::MemoryReadStream *decompRLE(Common::SeekableReadStream *in, int size) {
 	byte *data = new byte[size];
 	int32 pos = -1;
 	while (!in->eos()) {
@@ -54,7 +54,7 @@ Common::MemoryReadStream* decompRLE(Common::SeekableReadStream *in, int size) {
 	}
 
 	if (pos != size)
-		warning ("decompRLE expected %d, wrote %d", size, pos);
+		warning("decompRLE expected %d, wrote %d", size, pos);
 
 	Common::MemoryReadStream *stream = new Common::MemoryReadStream(data, size, DisposeAfterUse::YES);
 	return stream;
@@ -113,7 +113,7 @@ LZW::LZW(Common::SeekableReadStream *res, byte *data) {
 		bitpos += n_bits;
 		if (newcode == 256) {
 			SkipBits();
-			_res->skip((((bitpos-1)+((n_bits<<3)-(bitpos-1+(n_bits<<3))%(n_bits<<3)))-bitpos)>>3);
+			_res->skip((((bitpos - 1) + ((n_bits << 3) - (bitpos - 1 + (n_bits << 3)) % (n_bits << 3))) - bitpos) >> 3);
 			n_bits = 9;
 			free_entry = 256;
 			bitpos = 0;

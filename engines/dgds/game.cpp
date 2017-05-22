@@ -42,7 +42,7 @@ bool Game::init() {
 	//Resman.dumpResources("d:\\willy\\sub\\", true);
 	//Resman.dumpResources("d:\\willy\\", false);
 
-	Common::String gameName = Resman.findGDS();	
+	Common::String gameName = Resman.findGDS();
 
 	Resource *res = Resman.load(gameName + ".GDS");
 

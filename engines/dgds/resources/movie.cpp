@@ -55,20 +55,20 @@ Movie::~Movie() {
 void Movie::loadVER(Resource *res) {
 	res->seek(0);
 	_version = res->readLine();
-	debugC(1, "[%s] version: %s",res->getName(), _version.c_str());
+	debugC(1, "[%s] version: %s", res->getName(), _version.c_str());
 }
 
 void Movie::loadPAG(Resource *res) {
 	res->seek(0);
 	_pages = res->readUint16LE();
-	debugC(1, "[%s] pages: %d",res->getName(), _pages);
+	debugC(1, "[%s] pages: %d", res->getName(), _pages);
 }
 
 void Movie::loadTT3(Resource *res) {
 	res->seek(0);
 	byte comprMethod = res->readByte();
 	int32 streamSize = res->readUint32LE();
-	assert (comprMethod == 2);
+	assert(comprMethod == 2);
 
 	Common::SeekableReadStream *decomp = decompLZW(res, streamSize);
 
@@ -104,7 +104,7 @@ void Movie::loadTT3(Resource *res) {
 
 void Movie::play() {
 	for (uint32 i = 0; i < _chunks.size(); i++) {
-		debugN("%4d %04x %-39s: ", i, _chunks[i]->code, _chunks[i]->name.c_str() );
+		debugN("%4d %04x %-39s: ", i, _chunks[i]->code, _chunks[i]->name.c_str());
 
 		for (uint32 j = 0; j < _chunks[i]->data.size(); j++)
 			debugN(" %4d", _chunks[i]->data[j]);

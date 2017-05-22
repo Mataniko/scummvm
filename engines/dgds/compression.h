@@ -30,8 +30,8 @@
 
 namespace Dgds {
 
-Common::MemoryReadStream* decompLZW(Common::SeekableReadStream *in, int size);
-Common::MemoryReadStream* decompRLE(Common::SeekableReadStream *in, int size);
+Common::MemoryReadStream *decompLZW(Common::SeekableReadStream *in, int size);
+Common::MemoryReadStream *decompRLE(Common::SeekableReadStream *in, int size);
 
 class LZW {
 public:

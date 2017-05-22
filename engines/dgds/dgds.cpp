@@ -36,6 +36,7 @@
 
 #include "dgds/resources/moviegroup.h"
 #include "dgds/resources/movie.h"
+#include "dgds/resources/font.h"
 
 namespace Dgds {
 
@@ -62,7 +63,7 @@ Common::Error DgdsEngine::run() {
 	initGraphics(320, 200, true);
 
 	Common::String gameName = Resman.findGDS();
-	if(!gameName.size())
+	if (!gameName.size())
 		return Common::kNoGameDataFoundError;
 
 	if (gameName == "WILLY") {
@@ -83,14 +84,14 @@ Common::Error DgdsEngine::run() {
 	bool end = false;
 	Common::EventManager *em = _system->getEventManager();
 	while (!end) {
-		Common::Event ev;
-		if (em->pollEvent(ev)) {
-			if (ev.type == Common::EVENT_KEYDOWN) {
-				if (ev.kbd.keycode == Common::KEYCODE_ESCAPE)
-					end = true;
-			}
-		}
-		_system->delayMillis(10);
+	    Common::Event ev;
+	    if (em->pollEvent(ev)) {
+	        if (ev.type == Common::EVENT_KEYDOWN) {
+	            if (ev.kbd.keycode == Common::KEYCODE_ESCAPE)
+	                end = true;
+	        }
+	    }
+	    _system->delayMillis(10);
 	}
 	*/
 

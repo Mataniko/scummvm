@@ -51,7 +51,8 @@ namespace Dgds {
  */
 static const ADGameDescription DgdsGameDescriptions[] = {
 	// Heart of China - Spanish PC
-	{"china", "",
+	{
+		"china", "",
 		AD_ENTRY1s("volume.rmf", "072cffb026d91b8d25d11c70f4a57fb2", 10032),
 		Common::ES_ESP,
 		Common::kPlatformDOS,
@@ -60,7 +61,8 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	},
 
 	// Heart of China English PC
-	{"china", "",
+	{
+		"china", "",
 		AD_ENTRY1s("volume.rmf", "15a0bbe5aa5fd777494a2ef1c6fee378", 10008),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
@@ -69,25 +71,28 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	},
 
 	// Heart of China - English PC v1.216
-	{"china", "",
+	{
+		"china", "",
 		AD_ENTRY1s("volume.rmf", "2da720143c1e857490daded15682df87", 9791),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
-  // Heart of China - English Amiga
-	{"china", "",
+
+	// Heart of China - English Amiga
+	{
+		"china", "",
 		AD_ENTRY1s("volume.rmf", "b8f917288ce484c4969574da18b288ea", 11061),
 		Common::EN_ANY,
 		Common::kPlatformAmiga,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
-  // Heart of China - English Mac
-	{"china", "",
+
+	// Heart of China - English Mac
+	{
+		"china", "",
 		AD_ENTRY1s("volume.rmf", "c88125dabb6a547bca82ec27d82a25a6", 9918),
 		Common::EN_ANY,
 		Common::kPlatformMacintosh,
@@ -96,34 +101,38 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	},
 
 	// Rise of the Dragon - English Amiga
-	{"dragon", "",
+	{
+		"dragon", "",
 		AD_ENTRY1s("volume.rmf", "44cd1ffdfeb385dcfcd60563e1036167", 8972),
 		Common::EN_ANY,
 		Common::kPlatformAmiga,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
-  // Rise of the Dragon - English Amiga
-	{"dragon", "",
+
+	// Rise of the Dragon - English Amiga
+	{
+		"dragon", "",
 		AD_ENTRY1s("volume.rmf", "5618ac459de017b5cb723757b711fcba", 8972),
 		Common::EN_ANY,
 		Common::kPlatformAmiga,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
-  // Rise of the Dragon - English Mac
-	{"dragon", "",
+
+	// Rise of the Dragon - English Mac
+	{
+		"dragon", "",
 		AD_ENTRY1s("volume.rmf", "ef8fb69e932946643b608532e0af3ad9", 7079),
 		Common::EN_ANY,
 		Common::kPlatformMacintosh,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
+
 	// Rise of the Dragon - English PC v1.211
-	{"dragon", "",
+	{
+		"dragon", "",
 		AD_ENTRY1s("volume.vga", "0d9590fdc883d6d99c06e7935423d180", 7823),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
@@ -132,7 +141,8 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	},
 
 	// The Adventures of Willy Beamish - English PC v1.224
-	{"willy","",
+	{
+		"willy", "",
 		AD_ENTRY1s("volume.rmf", "ba5cf24ec4b6dc044b03115a0cd5f3ff", 9896),
 		Common::EN_ANY,
 		Common::kPlatformDOS,
@@ -141,16 +151,18 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 	},
 
 	// The Adventures of Willy Beamish - Amiga
-	{"willy", "",
+	{
+		"willy", "",
 		AD_ENTRY1s("volume.rmf",  "775388e795b17c33ce19d53b4fbd1003", 11906),
 		Common::EN_ANY,
 		Common::kPlatformAmiga,
 		ADGF_NO_FLAGS,
 		GUIO1(GUIO_NONE)
 	},
-  
-  // The Adventurs of Willy Beamish - English PC CD version
-	{"willy", "",
+
+	// The Adventurs of Willy Beamish - English PC CD version
+	{
+		"willy", "",
 		{
 			{ "resource.001", 0, "ddb2ca8176e00719efa9946450e3019c", 151525997 },
 			{ "resource.map", 0, "ee70604d1fcac9c7fa04e64cbb54fa47", 27237 },
@@ -163,11 +175,12 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 		GUIO1(GUIO_NONE)
 	},
 
-  // The Adventures of Willy Beamish - SegaCD
-	{"willy", "",
+	// The Adventures of Willy Beamish - SegaCD
+	{
+		"willy", "",
 		{
-      {"WINV.REQ", 0, "b7397f428c8dd10ee34addf63b3eff98", 556},
-      {"WVCR.REQ", 0, "ca76caf87e71eeaa36d3ad70a9fddfe0", 6000},
+			{"WINV.REQ", 0, "b7397f428c8dd10ee34addf63b3eff98", 556},
+			{"WVCR.REQ", 0, "ca76caf87e71eeaa36d3ad70a9fddfe0", 6000},
 			AD_LISTEND
 		},
 		Common::EN_ANY,
@@ -180,7 +193,8 @@ static const ADGameDescription DgdsGameDescriptions[] = {
 };
 
 static const ADGameDescription DgdsGameGeneric[] = {
-	{"dgds", 0,
+	{
+		"dgds", 0,
 		AD_ENTRY1("volume.rmf", NULL),
 		Common::UNK_LANG,
 		Common::kPlatformUnknown,
@@ -207,11 +221,15 @@ public:
 	}
 
 	//virtual const ADGameDescription *fallbackDetect(const FileMap &allFiles, const Common::FSList &fslist) const {
-	//	return detectGameFilebased(allFiles, Dgds::fileBasedFallback);
+	//  return detectGameFilebased(allFiles, Dgds::fileBasedFallback);
 	//}
 
-	virtual const char *getName() const { return "Dynamix Game Development System"; }
-	virtual const char *getOriginalCopyright() const { return "Dynamix Game Development System (c) Dynamix"; }
+	virtual const char *getName() const {
+		return "Dynamix Game Development System";
+	}
+	virtual const char *getOriginalCopyright() const {
+		return "Dynamix Game Development System (c) Dynamix";
+	}
 
 	virtual bool hasFeature(MetaEngineFeature f) const;
 	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
@@ -222,16 +240,16 @@ public:
 
 bool DgdsMetaEngine::hasFeature(MetaEngineFeature f) const {
 	return
-		(f == kSupportsListSaves) ||
-		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave);
+	    (f == kSupportsListSaves) ||
+	    (f == kSupportsLoadingDuringStartup) ||
+	    (f == kSupportsDeleteSave);
 }
 
 bool Dgds::DgdsEngine::hasFeature(EngineFeature f) const {
 	return
-		(f == kSupportsRTL) ||
-		(f == kSupportsLoadingDuringRuntime) ||
-		(f == kSupportsSavingDuringRuntime);
+	    (f == kSupportsRTL) ||
+	    (f == kSupportsLoadingDuringRuntime) ||
+	    (f == kSupportsSavingDuringRuntime);
 }
 
 bool DgdsMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const {

@@ -55,11 +55,21 @@ public:
 	void dump(Common::String const &outFilename, bool dumpSubres);
 
 	// SeekableReadStream members
-	bool   eos() const { return _stream->eos(); }
-	uint32 read(void *dataPtr, uint32 dataSize) { return _stream->read(dataPtr, dataSize); }
-	int32  pos() const { return _stream->pos(); }
-	int32  size() const { return _stream->size(); }
-	bool   seek(int32 offset, int whence = SEEK_SET) { return _stream->seek(offset, whence); }
+	bool   eos() const {
+		return _stream->eos();
+	}
+	uint32 read(void *dataPtr, uint32 dataSize) {
+		return _stream->read(dataPtr, dataSize);
+	}
+	int32  pos() const {
+		return _stream->pos();
+	}
+	int32  size() const {
+		return _stream->size();
+	}
+	bool   seek(int32 offset, int whence = SEEK_SET) {
+		return _stream->seek(offset, whence);
+	}
 
 	void listTags();
 
