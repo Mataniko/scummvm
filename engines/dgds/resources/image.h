@@ -8,12 +8,28 @@
 #ifndef DGDS_IMAGE_H_
 #define DGDS_IMAGE_H_
 
+#include "common/array.h"
+#include "dgds/resource.h"
+
 namespace Dgds {
+
+struct FrameInfo {
+	uint16 height;
+	uint16 width;
+	uint16 offsetX;
+	uint16 offsetY;
+};
 
 class Image {
 public:
-	Image();
+	Image(Resource *bmp);
 	virtual ~Image();
+
+private:
+	uint16 _frames;
+	Common::Array<FrameInfo> *_framesDefinition;
+	void loadFrames(Resource *res);
+
 };
 
 } /* namespace Dgds */
