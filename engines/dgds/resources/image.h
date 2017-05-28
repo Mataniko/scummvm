@@ -16,8 +16,7 @@ namespace Dgds {
 struct FrameInfo {
 	uint16 height;
 	uint16 width;
-	uint16 offsetX;
-	uint16 offsetY;
+	uint32 offset;
 };
 
 class Image {
@@ -27,7 +26,7 @@ public:
 
 private:
 	uint16 _frames;
-	Common::Array<FrameInfo> *_framesDefinition;
+	Common::Array<FrameInfo> _framesDefinition;
 	void loadFrames(Resource *res);
 
 };

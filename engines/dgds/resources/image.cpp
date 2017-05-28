@@ -5,7 +5,6 @@ namespace Dgds {
 Image::Image(Resource *bmp) {
 	// TODO Auto-generated constructor stub
 	Resource *data = bmp->getSubResource("BMP:");
-	_framesDefinition = new Common::Array<FrameInfo>();
 	loadFrames(data);
 
 	delete data;
@@ -13,7 +12,6 @@ Image::Image(Resource *bmp) {
 
 Image::~Image() {
 	// TODO Auto-generated destructor stub
-	delete _framesDefinition;
 
 }
 
@@ -25,17 +23,18 @@ void Image::loadFrames(Resource *res) {
 	_frames = inf->readUint16LE();
 
 	for (int i = 0; i < _frames; i++) {
-		FrameInfo fr;
+		_framesDefinition.push_back(FrameInfo());
 		inf->seek(4 * i + 2);
-		fr.width = inf->readUint16LE();
-		fr.height = inf->readUint16LE();
+		_framesDefinition[i].width = inf->readUint16LE();
+		_framesDefinition[i].height = inf->readUint16LE();
 
 		off->seek(4 * i);
-		fr.offsetX = off->readUint16LE();
-		fr.offsetY = off->readUint16LE();
-
-		_framesDefinition->push_back(fr);
+		_framesDefinition[i].offset = off->readUint32LE();
 	}
+
+	/*for (int i = 0; i < _framesDefinition.size(); i++) {
+	    debug("Frame Definition %i Start: %i (%02x)", i, _framesDefinition[i].offset, _framesDefinition[i].offset);
+	}*/
 
 	delete inf;
 	delete off;
