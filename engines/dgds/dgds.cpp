@@ -27,6 +27,7 @@
 #include "common/debug-channels.h"
 #include "common/system.h"
 #include "common/savefile.h"
+#include "graphics/palette.h"
 #include "gui/EventRecorder.h"
 
 #include "engines/util.h"
@@ -36,7 +37,9 @@
 
 #include "dgds/resources/moviegroup.h"
 #include "dgds/resources/movie.h"
+#include "dgds/resources/image.h"
 #include "dgds/resources/font.h"
+#include "dgds/resources/palette.h"
 
 namespace Dgds {
 
@@ -73,12 +76,54 @@ Common::Error DgdsEngine::run() {
 		error("DGDS Title %s currently not supported", gameName.c_str());
 	}
 
+
+
+
+	// debug
+	Resource *nurse = Resman.load("CN_NURSE.BMP");
+	Image *img = new Image(nurse);
+
+	/*
 	Resource *ttm = Resman.load("TITLE.TTM");
 	Movie *m = new Movie(ttm);
 	m->play();
 
 	delete ttm;
 	delete m;
+
+	Resource *fntRes = Resman.load("WVCR.FNT");
+	Font *font = new Font(fntRes);
+
+	Resource *palRes = Resman.load("DYNAMIX.PAL");
+	Palette *pal = new Palette(palRes);
+
+	byte *bPal = pal->getPalette();
+	byte wPal[0x300];
+
+	for (int i = 0; i < 0x300; i++) {
+	    wPal[i] = 0xff;
+	}
+
+
+	_system->getPaletteManager()->setPalette(bPal, 0, 256);
+	while (true) {
+
+	    for (int i = 0; i < 256; i++) {
+	        _system->delayMillis(200);
+	        _system->fillScreen(i);
+	        Graphics::Surface *screenSurface = _system->lockScreen();
+	        font->drawString(screenSurface, 10, 10, "whatever you want to say", 0);
+	        _system->unlockScreen();
+	        _system->updateScreen();
+	    }
+
+	}
+	*/
+
+	// end debug
+
+
+
 
 	/*
 	bool end = false;
