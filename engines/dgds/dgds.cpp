@@ -39,6 +39,7 @@
 #include "dgds/resources/movie.h"
 #include "dgds/resources/image.h"
 #include "dgds/resources/font.h"
+#include "dgds/resources/screen.h"
 #include "dgds/resources/palette.h"
 
 namespace Dgds {
@@ -80,8 +81,29 @@ Common::Error DgdsEngine::run() {
 
 
 	// debug
-	Resource *nurse = Resman.load("CN_NURSE.BMP");
-	Image *img = new Image(nurse);
+	//Resource *nurse = Resman.load("CN_NURSE.BMP");
+	//Image *img = new Image(nurse);
+
+	Resource *scrRes = Resman.load("DYNAMIX.SCR");
+//	Screen *scr = new Screen(scrRes);
+	Resource *palRes = Resman.load("DYNAMIX.PAL");
+	Palette *pal = new Palette(palRes);
+	Resource *fntRes = Resman.load("8X8.FNT");
+	Font *font = new Font(fntRes);
+
+	_system->getPaletteManager()->setPalette(pal->getPalette(), 0, 256);
+	while (true) {
+
+		for (int i = 0; i < 256; i++) {
+			_system->delayMillis(400);
+			_system->fillScreen(i);
+			Graphics::Surface *screenSurface = _system->lockScreen();
+			font->drawString(screenSurface, 10, 10, "whatever you want to say", 0);
+			_system->unlockScreen();
+			_system->updateScreen();
+		}
+
+	}
 
 	/*
 	Resource *ttm = Resman.load("TITLE.TTM");

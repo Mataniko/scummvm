@@ -39,8 +39,8 @@ Game::~Game() {
 bool Game::init() {
 	bool ret = false;
 
-	//Resman.dumpResources("d:\\willy\\sub\\", true);
-	//Resman.dumpResources("d:\\willy\\", false);
+	Resman.dumpResources("d:\\willy\\sub\\", true);
+	Resman.dumpResources("d:\\willy\\", false);
 
 	Common::String gameName = Resman.findGDS();
 

@@ -1,4 +1,5 @@
 #include "dgds/resources/image.h"
+#include "dgds/compression.h"
 
 namespace Dgds {
 
