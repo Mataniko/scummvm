@@ -39,6 +39,7 @@
 #include "engines/engine.h"
 #include "engines/metaengine.h"
 #include "graphics/cursorman.h"
+#include "graphics/palette.h"
 #include "graphics/surface.h"
 #include "gui/saveload.h"
 
@@ -548,15 +549,14 @@ void  Interpreter::scheduleSave(int slotNumber, const char *saveDescription) {
  * Shows the ScummVM GMM Save or Load dialog
  */
 void Interpreter::showSaveLoadDialog(bool saveFlag) {
-	const EnginePlugin *plugin = 0;
+	const Plugin *plugin = 0;
 	EngineMan.findGame(((GargoyleEngine *)g_engine)->getGameId(), &plugin);
 	GUI::SaveLoadChooser *dialog;
 	if (saveFlag)
-		dialog = new GUI::SaveLoadChooser("Save game:", "Save");
+		dialog = new GUI::SaveLoadChooser("Save game:", "Save", true);
 	else
-		dialog = new GUI::SaveLoadChooser("Load game:", "Load");
-
-	dialog->setSaveMode(saveFlag);
+		dialog = new GUI::SaveLoadChooser("Load game:", "Load", false);
+	
 	_saveSlot = dialog->runModalWithPluginAndTarget(plugin, ConfMan.getActiveDomainName());
 
 	if ((_saveSlot >= 0) && saveFlag) {
@@ -584,7 +584,7 @@ uint8 Interpreter::getDefaultColour(bool fore) const {
 }
 
 uint8 Interpreter::getColourIndex(uint32 rgb) const {
-	uint32 palette[256];
+	uint32 palette[256];	
 	g_system->getPaletteManager()->grabPalette((byte *)&palette[0], 0, 256);
 
 	for (int i = 0; i < 256; ++i) {

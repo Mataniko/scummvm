@@ -46,22 +46,22 @@ static int strToInt(const char *s) {
 
 void FrotzInterpreter::initDebugger() {
 	// Register debugger methods
-	DCmd_Register("sound",			WRAP_METHOD(FrotzInterpreter, cmd_sound));
+	Debugger::registerCmd("sound",			WRAP_METHOD(FrotzInterpreter, cmd_sound));
 }
 
 /**
  * Debugger method to start a given sound number
  */
 bool FrotzInterpreter::cmd_sound(int argc, const char **argv) {
-	if (argc == 1) {
-		DebugPrintf("sound <sound_number>\n");
+	if (argc == 1) {		
+		Debugger::debugPrintf("sound <sound_number>\n");
 		return true;
 	}
 
 	if (_os.getSound())
 		_os.getSound()->play(strToInt(argv[1]), 0, 255, 0);
 	else
-		DebugPrintf("Game does not support sound\n");
+		Debugger::debugPrintf("Game does not support sound\n");
 
 	return true;
 }

@@ -60,7 +60,7 @@ uint32 GargoyleEngine::getGameID() const {
 }
 
 const char *GargoyleEngine::getGameId() const {
-	return _gameDescription->desc.gameid;
+	return _gameDescription->desc.gameId;
 }
 
 
@@ -147,25 +147,8 @@ struct GameSettings {
 	GargoyleGameId gameId;
 };
 
-static const ADParams detectionParams = {
-	// Pointer to ADGameDescription or its superset structure
-	NULL, //(const byte *)Gargoyle::gameDescriptions,
-	// Size of that superset structure
-	0, //sizeof(Gargoyle::GargoyleGameDescription),
-	// Number of bytes to compute MD5 sum for
-	5000,
-	// List of all engine targets
-	gargoyleGames,
-	// Structure for autoupgrading obsolete targets
-	0,
-	// Name of single gameid (optional)
-	"gargoyle",
-	// List of files for file-based fallback detection (optional)
-	0,
-	// Flags
-	0,
-	// Additional GUI options (for every game}
-	Common::GUIO_NOSPEECH
+static const ADExtraGuiOptionsMap gameGuiOptions[] = {
+	AD_EXTRA_GUI_OPTIONS_TERMINATOR
 };
 
 } // End of namespace Gargoyle
@@ -177,8 +160,16 @@ class GargoyleMetaEngine : public AdvancedMetaEngine {
 	mutable Common::String	_extra;
 
 public:
-	GargoyleMetaEngine() : AdvancedMetaEngine(detectionParams) {}
-
+	GargoyleMetaEngine() : AdvancedMetaEngine(
+		gargoyleGames,
+		sizeof(Gargoyle::GargoyleGameDescription),
+		gargoyleGames,
+		gameGuiOptions
+	) {
+		_singleId = "gargoyle";
+		_guiOptions = GUIO_NOSPEECH;
+	}
+	
 	virtual const char *getName() const {
 		return "Gargoyle Engine";
 	}
@@ -193,7 +184,7 @@ public:
 	virtual Common::Error createInstance(OSystem *syst, Engine **engine) const;
 	virtual bool createInstance(OSystem *syst, Engine **engine, const ADGameDescription *desc) const;
 
-	virtual GameList detectGames(const Common::FSList &fslist) const;
+	virtual DetectedGames detectGames(const Common::FSList &fslist) const;
 };
 
 bool GargoyleMetaEngine::hasFeature(MetaEngineFeature f) const {
@@ -258,7 +249,7 @@ Common::Error GargoyleMetaEngine::createInstance(OSystem *syst, Engine **engine)
 		return Common::kUnknownError;
 
 	// Create a skeleton game descriptor to pass to the engine
-	gameDesc.desc.gameid = strdup(gameId.c_str());
+	gameDesc.desc.gameId = Common::String(gameId.c_str()).c_str();
 	gameDesc.desc.language = Common::parseLanguage(ConfMan.get("language"));
 	gameDesc.desc.platform = Common::parsePlatform(ConfMan.get("platform"));
 	gameDesc.filename = ConfMan.get("filename");
@@ -276,8 +267,8 @@ bool GargoyleMetaEngine::createInstance(OSystem *syst, Engine **engine, const AD
 	return Common::kNoError;
 }
 
-GameList GargoyleMetaEngine::detectGames(const Common::FSList &fslist) const {
-	GameList detectedGames;
+DetectedGames GargoyleMetaEngine::detectGames(const Common::FSList &fslist) const {
+	DetectedGames detectedGames;
 	char target[20], version[20];
 	Common::Language lang;
 
@@ -288,7 +279,7 @@ GameList GargoyleMetaEngine::detectGames(const Common::FSList &fslist) const {
 		if (Frotz::FrotzInterpreter::validateFile(*file, target, version, lang)) {
 			// Scan through the Gargoyle game list to get the game description
 			const PlainGameDescriptor *p = &gargoyleGames[0];
-			while ((p->gameid != NULL) && (strcmp(p->gameid, target) != 0))
+			while ((p->gameId != NULL) && (strcmp(p->gameId, target) != 0))
 				++p;
 
 			// Set up the full game description
@@ -300,12 +291,12 @@ GameList GargoyleMetaEngine::detectGames(const Common::FSList &fslist) const {
 			desc += Common::getLanguageDescription(lang);
 			desc += ")";
 
-			GameDescriptor gd(target, desc);
-			gd["filename"] = file->getName();
-			gd["language"] = "en";
-			gd["platform"] = "pc";
-
-			detectedGames.push_back(gd);
+			DetectedGame dg(target, desc);			
+			dg.language = Common::EN_USA;
+			dg.platform = Common::kPlatformDOS;
+			//gd["filename"] = file->getName();			
+			
+			detectedGames.push_back(dg);
 		}
 	}
 

@@ -26,6 +26,7 @@
 #include "gargoyle/frotz_static.h"
 
 #include "common/util.h"
+#include "graphics/fonts/bdf.h"
 
 namespace Frotz {
 
@@ -203,7 +204,7 @@ const unsigned char tolower_cyrillic[0x60] = {
 };
 
 /* Character bitmap data for the Frotz interpreter character graphics font. */
-static const Graphics::bitmap_t _font_bits[] = {
+static const unsigned int _font_bits[] = {
 	0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 
 	0x0000, 0x0000, 0x2000, 0x6000, 0xfe00, 0x6000, 0x2000, 0x0000, 
 	0x0000, 0x0000, 0x0800, 0x0c00, 0xfe00, 0x0c00, 0x0800, 0x0000, 
@@ -402,20 +403,24 @@ static const unsigned long _font_offset[] = {
 /* Infocom character graphics font used in Beyond Zork. Note that whilst the raw data is for 8x8, the font 
  * needs to be defined as 8x14, so as to match the size of the ScummVM big font
  */
-const Graphics::FontDesc infocomGfxFont = {
+const Graphics::BdfBoundingBox infocomGfxFontBoundingBox = { 8, 8, 0, 0 };
+const Graphics::BdfFontData infocomGfxFont = {
 	"InfocomCharGfx",
+	"",
+
 	8,
 	14,
-	8, 8, 0, 0,
+	10,
+	infocomGfxFontBoundingBox,
+	11,
+
 	11,
 	32,
 	95,
-	_font_bits,
-	_font_offset,
-	NULL,  /* fixed width*/
-	NULL,  /* fixed bbox*/
-	32,
-	sizeof(_font_bits)/sizeof(Graphics::bitmap_t)
+
+	NULL,
+	NULL,
+	NULL
 };
 
 struct FrotzStringRecord {

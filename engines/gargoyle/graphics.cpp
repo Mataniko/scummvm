@@ -51,7 +51,7 @@ RGBList::RGBList(int numEntries, uint32 *srcData, bool freeData) {
 	}
 
 	_palIndexes = new byte[numEntries];
-	Common::set_to(&_palIndexes[0], &_palIndexes[numEntries], 0);
+	Common::fill(&_palIndexes[0], &_palIndexes[numEntries], 0);
 }
 
 RGBList::~RGBList() {
@@ -192,8 +192,7 @@ void ScreenSurface::init(const Common::Rect &bounds, int pitchAmount, byte *data
 	_left = bounds.left;
 	
 	w = bounds.width();
-	h = bounds.height();
-	bytesPerPixel = 1;
+	h = bounds.height();	
 	pitch = pitchAmount;
 
 	_freeData = !data;

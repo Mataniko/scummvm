@@ -27,7 +27,6 @@
 #include "gargoyle/frotz_interp.h"
 #include "gargoyle/gargoyle.h"
 
-#include "common/EventRecorder.h"
 #include "common/events.h"
 #include "common/md5.h"
 #include "graphics/cursorman.h"

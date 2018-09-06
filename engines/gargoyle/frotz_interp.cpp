@@ -30,9 +30,9 @@
 #include "gargoyle/gargoyle.h"
 #include "gargoyle/frotz_static.h"
 
-#include "common/EventRecorder.h"
 #include "common/events.h"
 #include "common/file.h"
+#include "graphics/palette.h"
 #include "engines/engine.h"
 #include "engines/util.h"
 #include "graphics/cursorman.h"
@@ -194,8 +194,11 @@ int inline fgetb(Common::InSaveFile *f) {
 
 FrotzInterpreter::FrotzInterpreter(Gargoyle::GargoyleEngine &engine): 
 		Interpreter(engine), _os(_h, *this) {
-	g_eventRec.registerRandomSource(_rnd, "frotzInterpreter");
-
+	
+//#ifdef ENABLE_EVENTRECORDER
+//	g_eventRec.registerRandomSource(_rnd, "frotzInterpreter");
+//#endif
+	_rnd = new Common::RandomSource("frotzInterpreter");
 	initInterpVars();
 
 	initDebugger();
@@ -288,7 +291,7 @@ void FrotzInterpreter::initInterpVars() {
  * Setup the custom font needed 
  */
 void FrotzInterpreter::init_fonts() {
-	_gfxFont = new Graphics::NewFont(infocomGfxFont);
+	_gfxFont = new Graphics::BdfFont(infocomGfxFont, DisposeAfterUse::NO);
 	FontMan.assignFontToName(S_GFX_CHAR_FONT, _gfxFont);
 }
 
@@ -306,7 +309,7 @@ void FrotzInterpreter::init_palette() {
 
 	// Clear the remainder of the palette
 	uint32 emptyPalette[240];
-	Common::set_to(&emptyPalette[0], &emptyPalette[240], 0);
+	Common::fill(&emptyPalette[0], &emptyPalette[240], 0);
 	g_system->getPaletteManager()->setPalette((const byte *)&emptyPalette[0], 16, 240);
 }
 
@@ -2226,7 +2229,7 @@ void FrotzInterpreter::init_screen() {
 	// For all other versions, use the taller screen size of 640x480
 	int y = (_h.h_version == V6) ? 400 : 480;
 	_screen.init(Common::Rect(0, 0, 640, y), 640);
-	initGraphics(640, y, true);
+	initGraphics(640, y);
 
 	font_height = 1;
 	font_width = 1;
