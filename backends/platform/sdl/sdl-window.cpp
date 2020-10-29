@@ -192,7 +192,7 @@ bool SdlWindow::hasMouseFocus() const {
 #endif
 }
 
-bool SdlWindow::warpMouseInWindow(int x, int y) {
+bool SdlWindow::warpMouseInWindow(int x, int y) {	
 	if (hasMouseFocus()) {
 #if SDL_VERSION_ATLEAST(2, 0, 0)
 		if (_window) {
@@ -312,6 +312,7 @@ bool SdlWindow::createOrUpdateWindow(int width, int height, uint32 flags) {
 
 	if (!_window || oldNonUpdateableFlags != newNonUpdateableFlags) {
 		destroyWindow();
+		debug("creating window");
 		_window = SDL_CreateWindow(_windowCaption.c_str(), _lastX,
 								   _lastY, width, height, flags);
 		if (_window) {

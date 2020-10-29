@@ -956,8 +956,9 @@ void OpenGLGraphicsManager::handleResizeImpl(const int width, const int height, 
 	overlayHeight = MAX<uint>(overlayHeight, 200);
 
 	// HACK: Reduce the size of the overlay on high DPI screens.
-	overlayWidth = fracToInt(overlayWidth * (intToFrac(90) / xdpi));
-	overlayHeight = fracToInt(overlayHeight * (intToFrac(90) / ydpi));
+	// TODO: hidpi Check this function for DPI
+	// overlayWidth = fracToInt(overlayWidth * (intToFrac(90) / xdpi));
+	// overlayHeight = fracToInt(overlayHeight * (intToFrac(90) / ydpi));
 
 	if (!_overlay || _overlay->getFormat() != _defaultFormatAlpha) {
 		delete _overlay;
