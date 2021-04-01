@@ -57,6 +57,7 @@ lib*.a
 /doc/de/NEUES
 /doc/de/NEUES.html
 /doc/docportal/_build
+/ScummVM Manual*.pdf
 
 /build*
 /staging
