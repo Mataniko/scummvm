@@ -1099,7 +1099,7 @@ Optional Features:
                            into the ScummVM binary
 
 Optional Documentation Options:
-  --with-manual-version=VERSION version to use when generating the manuak (optional)
+  --with-manual-version=VERSION version to use when generating the manual (optional)
   --with-pandoc-format=FORMAT   pandoc format to use during the conversion (optional)
 
 Optional Libraries:
